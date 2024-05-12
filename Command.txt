@@ -1,0 +1,21 @@
+
+
+docker-compose up -d
+docker-compose up -d --build
+
+docker compose run --rm artisan migrate
+
+docker compose run --rm artisan test
+
+
+
+
+
+
+
+
+
+
+
+
+
