@@ -8,7 +8,7 @@ docker compose run --rm artisan migrate
 docker compose run --rm artisan test
 
 
-
+docker-compose run --rm composer create-project --prefer-dist laravel/laravel .
 
 
 
