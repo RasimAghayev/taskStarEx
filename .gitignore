@@ -1,3 +1,5 @@
+/.idea
+/.vscode
 /src/be/vendor/
 /src/be/node_modules/
 /src/be/npm-debug.log
