@@ -1,0 +1,453 @@
+{
+	"info": {
+		"_postman_id": "d851a184-a225-4a6d-a54b-26bc30a6e8ac",
+		"name": "taskStarEx",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "1965733"
+	},
+	"item": [
+		{
+			"name": "company",
+			"item": [
+				{
+					"name": "users",
+					"item": [
+						{
+							"name": "/",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Updated response time test\r",
+											"pm.test(\"Response time is less than 500ms\", function () {\r",
+											"  pm.expect(pm.response.responseTime).to.be.below(500);\r",
+											"});\r",
+											"\r",
+											"// Test to check the length of the response data\r",
+											"pm.test(\"Response data length must be greater than zero\", function () {\r",
+											"  const responseData = pm.response.json();\r",
+											"  pm.expect(responseData.length).to.be.greaterThan(0, \"Response data should not be empty\");\r",
+											"});\r",
+											"\r",
+											"// Test to check that the response time is within an acceptable range\r",
+											"pm.test(\"Response time is within an acceptable range\", function () {\r",
+											"  pm.expect(pm.response.responseTime).to.be.within(100, 500);\r",
+											"});\r",
+											"// Test to check the response content type\r",
+											"pm.test(\"Response has the correct content type\", function () {\r",
+											"    pm.expect(pm.response.headers.get('Content-Type')).to.include('application/json');\r",
+											"});\r",
+											"// Add a test to validate the response schema\r",
+											"pm.test(\"Schema is valid\", function () {\r",
+											"  var schema = {\r",
+											"    type: \"object\",\r",
+											"    properties: {\r",
+											"      id: { type: \"number\" },\r",
+											"      username: { type: \"string\" },\r",
+											"      email: { type: \"string\", format: \"email\" },\r",
+											"      fullName: { type: \"string\" },\r",
+											"      avatar: { type: [\"string\", \"null\"] },\r",
+											"      isPublic: { type: \"boolean\" }\r",
+											"    },\r",
+											"    required: [\"id\", \"username\", \"email\", \"fullName\", \"avatar\", \"isPublic\"],\r",
+											"  };\r",
+											"\r",
+											"  var responseData = pm.response.json();\r",
+											"  pm.expect(tv4.validate(responseData, schema)).to.be.true;\r",
+											"});\r",
+											"// Add a test to check the response against a saved value\r",
+											"pm.test(\"Check response against saved value\", function () {\r",
+											"    var savedUserId = pm.globals.get(\"userId\"); // Retrieve the saved \"userId\" value from the global variables\r",
+											"    var responseBody = pm.response.json();\r",
+											"    var responseUserId = responseBody.user.id;\r",
+											"\r",
+											"    pm.expect(responseUserId).to.equal(savedUserId);\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Response headers include necessary information\", function () {\r",
+											"    pm.response.to.have.header(\"Content-Type\");\r",
+											"    pm.response.to.have.header(\"Date\");\r",
+											"    pm.response.to.have.header(\"Content-Length\");\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Response data contains the required fields\", function () {\r",
+											"  const responseData = pm.response.json();\r",
+											"\r",
+											"  pm.expect(responseData).to.be.an('object');\r",
+											"  pm.expect(responseData).to.have.property('id');\r",
+											"  pm.expect(responseData).to.have.property('name');\r",
+											"  pm.expect(responseData).to.have.property('email');\r",
+											"  pm.expect(responseData).to.have.property('role');\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Email is in a valid format\", function () {\r",
+											"  const responseData = pm.response.json();\r",
+											"  \r",
+											"  pm.expect(responseData.email).to.be.a('string');\r",
+											"  pm.expect(responseData.email).to.match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/);\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Avatar is either a string or null in the response\", function () {\r",
+											"    const responseData = pm.response.json();\r",
+											"    \r",
+											"    pm.expect(responseData.avatar).to.satisfy((avatar) => {\r",
+											"        return typeof avatar === 'string' || avatar === null;\r",
+											"    });\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Response headers include necessary information\", function () {\r",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.exist;\r",
+											"    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.exist;\r",
+											"    pm.expect(pm.response.headers.get(\"Expires\")).to.exist;\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Presence of specific header in the response\", function () {\r",
+											"    pm.expect(pm.response.headers.get(\"X-Auth-Token\")).to.exist;\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Response has the correct content type\", function () {\r",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r",
+											"});\r",
+											"\r",
+											"\r",
+											"pm.test(\"Check response against saved value\", function () {\r",
+											"    const savedValue = \"example_saved_value\";\r",
+											"    const responseData = pm.response.json();\r",
+											"    \r",
+											"    pm.expect(responseData).to.eql(savedValue);\r",
+											"});\r",
+											"\r",
+											"\r",
+											"pm.test(\"Response headers include necessary information\", function () {\r",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.exist;\r",
+											"    pm.expect(pm.response.headers.get(\"Cache-Control\")).to.exist;\r",
+											"    pm.expect(pm.response.headers.get(\"Expires\")).to.exist;\r",
+											"});\r",
+											"\r",
+											"\r",
+											"pm.test(\"Presence of specific header in the response\", function () {\r",
+											"    pm.response.to.have.header(\"X-Custom-Header\");\r",
+											"});\r",
+											"\r",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"fin\": \"{{randomFIN}}\",\r\n    \"name\": \"{{$randomFirstName}}\",\r\n    \"surname\": \"{{$randomLastName}}\",\r\n    \"father\": \"{{$randomFirstName}}\",\r\n    \"dob\": \"{{randomDateSpec}}\",\r\n    \"email\": \"{{$randomEmail}}\",\r\n    \"status\": \"{{randomUserStatus}}\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{apiUrl}}/company/users",
+									"host": [
+										"{{apiUrl}}"
+									],
+									"path": [
+										"company",
+										"users"
+									]
+								},
+								"description": "The `POST /company/users` endpoint is used to create a new user in the company. The request should include the user's financial information, name, surname, father's name, date of birth, email, and status.\n\n### Request Body\n\n- `fin` (string): The user's financial information.\n- `name` (string): The user's first name.\n- `surname` (string): The user's last name.\n- `father` (string): The user's father's name.\n- `dob` (string): The user's date of birth.\n- `email` (string): The user's email address.\n- `status` (string): The user's status.\n    \n\n### Response\n\nThe response of this request is a JSON schema. Since the specific structure of the response is not provided, the JSON schema for the response will depend on the actual response structure returned by the API."
+							},
+							"response": []
+						},
+						{
+							"name": "/",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"// Updated response time test to 300ms\r",
+											"pm.test(\"Response status code is 200\", function () {\r",
+											"    pm.response.to.have.status(200);\r",
+											"});\r",
+											"\r",
+											"// Response time test\r",
+											"pm.test(\"Response time is less than 300ms\", function () {\r",
+											"    pm.expect(pm.response.responseTime).to.be.below(300);\r",
+											"});\r",
+											"\r",
+											"// Content-Type header test\r",
+											"pm.test(\"Content-Type header is application/json\", function () {\r",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/json\");\r",
+											"});\r",
+											"\r",
+											"// Email format test\r",
+											"pm.test(\"Email is in a valid format\", function () {\r",
+											"    const responseData = pm.response.json();\r",
+											"  \r",
+											"    pm.expect(responseData.data).to.be.an('array');\r",
+											"    // Check email format for each user\r",
+											"    responseData.data.forEach(function(user) {\r",
+											"        pm.expect(user.email).to.be.a('string').and.to.match(/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/);\r",
+											"    });\r",
+											"});\r",
+											"\r",
+											"pm.test(\"Content-Type header is present in the response\", function () {\r",
+											"    pm.expect(pm.response.headers.get(\"Content-Type\")).to.exist;\r",
+											"});\r",
+											"\r",
+											"\r",
+											"pm.test(\"Request body contains the required fields\", function () {\r",
+											"    const responseData = pm.response.json();\r",
+											"    \r",
+											"    pm.expect(responseData).to.be.an('object');\r",
+											"    const requiredFields = [\"fin\", \"name\", \"surname\", \"father\", \"dob\", \"email\", \"status\", \"created_at\", \"updated_at\"];\r",
+											"    requiredFields.forEach(field => {\r",
+											"        pm.expect(responseData).to.have.property(field);\r",
+											"    });\r",
+											"});\r",
+											"\r",
+											"\r",
+											"pm.test(\"Error message is not present in the response\", function () {\r",
+											"    const responseData = pm.response.json();\r",
+											"    \r",
+											"    pm.expect(responseData).to.be.an('object');\r",
+											"    pm.expect(responseData).to.not.have.property('error');\r",
+											"});\r",
+											"\r",
+											"\r",
+											"pm.test(\"Each 'fin' in the response is a non-empty string\", function () {\r",
+											"    const responseData = pm.response.json();\r",
+											"    \r",
+											"    pm.expect(responseData).to.be.an('object');\r",
+											"    pm.expect(responseData.data).to.be.an('array');\r",
+											"    \r",
+											"    responseData.data.forEach(function(user) {\r",
+											"        pm.expect(user.fin).to.be.a('string').and.to.have.lengthOf.at.least(1, \"Value should not be empty\");\r",
+											"    });\r",
+											"});\r",
+											"\r",
+											"\r",
+											"pm.test(\"Each 'dob' in the response is in a valid date format\", function () {\r",
+											"    const responseData = pm.response.json();\r",
+											"    \r",
+											"    pm.expect(responseData).to.be.an('object');\r",
+											"    responseData.data.forEach(function(user) {\r",
+											"        pm.expect(user.dob).to.match(/^\\d{4}-\\d{2}-\\d{2}$/);\r",
+											"    });\r",
+											"});\r",
+											"\r",
+											""
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{apiUrl}}/company/users",
+									"host": [
+										"{{apiUrl}}"
+									],
+									"path": [
+										"company",
+										"users"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "/:fin",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{apiUrl}}/company/users/:fin",
+									"host": [
+										"{{apiUrl}}"
+									],
+									"path": [
+										"company",
+										"users",
+										":fin"
+									],
+									"variable": [
+										{
+											"key": "fin",
+											"value": "123AZDL"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "/:fin",
+							"request": {
+								"method": "PATCH",
+								"header": [],
+								"body": {
+									"mode": "raw",
+									"raw": "{\r\n    \"fin\": \"{{randomFIN}}\",\r\n    \"name\": \"{{$randomFirstName}}\",\r\n    \"surname\": \"{{$randomLastName}}\",\r\n    \"father\": \"{{$randomFirstName}}\",\r\n    \"dob\": \"{{randomDateSpec}}\",\r\n    \"email\": \"{{$randomEmail}}\",\r\n    \"status\": \"{{randomUserStatus}}\"\r\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{apiUrl}}/company/users/:fin",
+									"host": [
+										"{{apiUrl}}"
+									],
+									"path": [
+										"company",
+										"users",
+										":fin"
+									],
+									"variable": [
+										{
+											"key": "fin",
+											"value": "123AZDL"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "/:id",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{apiUrl}}/company/users/:id",
+									"host": [
+										"{{apiUrl}}"
+									],
+									"path": [
+										"company",
+										"users",
+										":id"
+									],
+									"variable": [
+										{
+											"key": "id",
+											"value": "ONMA092"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					"function randomString(minValue, maxValue, dataSet = 'abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ') {\r",
+					"    if (!minValue) {\r",
+					"        minValue = 20;\r",
+					"        maxValue = 20;\r",
+					"    }\r",
+					"\r",
+					"    if (!maxValue) {\r",
+					"        maxValue = minValue;\r",
+					"    }\r",
+					"\r",
+					"    let length = _.random(minValue, maxValue),\r",
+					"        randomString = \"\";\r",
+					"\r",
+					"    for (let i = 0; i < length; i++)\r",
+					"        randomString += dataSet.charAt(Math.floor(Math.random() * dataSet.length));\r",
+					"    return randomString;\r",
+					"}\r",
+					"\r",
+					"pm.variables.set('randomFIN', randomString(7,7,'0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'));\r",
+					"\r",
+					"function randomDate() {\r",
+					"    let start=new Date(1950, 0, 1);\r",
+					"        end=new Date(),\r",
+					"        d = new Date(\r",
+					"            start.getTime() + \r",
+					"            Math.random() * \r",
+					"            (\r",
+					"                end.getTime() - \r",
+					"                start.getTime()\r",
+					"            )\r",
+					"        ),\r",
+					"        month = '' + (d.getMonth() + 1),\r",
+					"        day = '' + d.getDate(),\r",
+					"        year = d.getFullYear();\r",
+					"\r",
+					"    if (month.length < 2) month = '0' + month;\r",
+					"    if (day.length < 2) day = '0' + day;\r",
+					"\r",
+					"    return [year, month, day].join('-');\r",
+					"}\r",
+					"pm.variables.set('randomDateSpec', randomDate());\r",
+					"\r",
+					"\r",
+					"function getRandomItem() {\r",
+					"    let set=['new_register','it_works','vacation','maternity_leave','education','business_trip','out','removed']\r",
+					"    let items = Array.from(set);\r",
+					"    return items[Math.floor(Math.random() * items.length)];\r",
+					"}\r",
+					"\r",
+					"\r",
+					"pm.variables.set('randomUserStatus', getRandomItem());\r",
+					"\r",
+					"\r",
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "apiUrl",
+			"value": "http://localhost/api",
+			"type": "string"
+		},
+		{
+			"key": "randomFIN",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "randomDateSpec",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "randomUserStatus",
+			"value": "",
+			"type": "string"
+		}
+	]
+}
