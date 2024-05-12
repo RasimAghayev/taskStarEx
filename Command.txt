@@ -10,6 +10,7 @@ docker compose run --rm artisan migrate
 docker compose run --rm artisan test
 
 
+docker compose run --rm npx nuxi@latest init .
 
 
 
