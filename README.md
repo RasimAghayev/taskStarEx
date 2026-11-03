@@ -1,3 +1,5 @@
+![Views](https://hits.sh/github.com/RasimAghayev/taskStarEx.svg?label=views&color=0e75b6)
+
 
 # Task
 ## Interview Task: User Management System
