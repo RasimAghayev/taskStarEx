@@ -4,7 +4,7 @@ namespace App\Interfaces\Company;
 
 interface UserRepositoryInterface
 {
-    public function index();
+    public function index($search = null, $perPage = 15);
 
     public function getByFin($id);
 
