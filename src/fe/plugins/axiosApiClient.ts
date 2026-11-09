@@ -1,15 +1,28 @@
-import axios from 'axios';
+﻿import axios from 'axios'
 
-export default defineNuxtPlugin((nuxtApp) => {
-    const runctimeConfig = useRuntimeConfig()
-    const axiosApiClient = axios.create()
-    axiosApiClient.defaults.baseURL = runctimeConfig.public.apiUrl
-    axiosApiClient.interceptors.request.use(function (config) {
-        return config;
-    });
-    return {
-        provide: {
-            axiosApiClient: axiosApiClient,
-        },
-    };
-});
+export default defineNuxtPlugin(() => {
+  const config = useRuntimeConfig()
+  const axiosApiClient = axios.create({
+    baseURL: config.public.apiUrl || 'http://localhost/api',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+  })
+
+  axiosApiClient.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      if (error?.response?.data?.message) {
+        console.error(error.response.data.message)
+      }
+      return Promise.reject(error)
+    }
+  )
+
+  return {
+    provide: {
+      axiosApiClient,
+    },
+  }
+})
