@@ -8,6 +8,22 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Removed — Phase 7 dead-code removal (2026-11-18)
+
+- `apache.dockerfile` + `server/apache/httpd-vhosts.conf` — confirmed unreferenced anywhere (CI, Makefile, `docker-compose.yml`, `Command.txt`, README) by Phase 2/3 and independently re-confirmed here by repo-wide grep. The real web server is the `nginx` service (`nginx.dockerfile` + `server/nginx/default.conf`). The two now-dangling `.dockerignore` entries for these paths were removed in the same commit.
+- `src/fe/components/DatePicker.vue` — confirmed unused: both consuming pages (`create.vue`, `[fin].vue`) use a plain `v-text-field type="date"` instead. Re-confirmed independently via grep (catches Nuxt's auto-registered-component template usage, not just explicit imports) and via `knip` (Nuxt-aware static analysis, run in Docker), which also lists it under "Unused files". Was the only file under `src/fe/components/`.
+- `vuex` dependency (`src/fe/package.json`) — confirmed zero usage: no `store/` directory, zero `vuex`/`useStore`/`createStore`/`$store`/`mapState`/`mapGetters`/`mapActions`/`mapMutations` references anywhere. Independently re-confirmed by three methods: grep, `depcheck`, and `knip` (both run in Docker against the `node:26.13.1-alpine` base image used by `node.dockerfile`). This is dead-dependency removal only — **not** a Vuex→Pinia migration; there was never an actual store to migrate. `pinia` (added in Phase 6) is left untouched; its real wiring, if any, is Phase 8 scope.
+
+**Tooling cross-check, not acted on:** both `depcheck` and `knip` also flag `vue-router` and `pinia` as "unused" by their static-analysis heuristics. Neither was removed:
+- `vue-router` is a false positive — `app.vue` uses the `<router-view/>` primitive (confirmed by grep), and Nuxt's file-based `pages/` routing depends on `vue-router` internally with no explicit source-level import to detect. Removing it would break routing. It is also explicitly out of this phase's scope (kept at `^5.0.0` per the repo owner's Phase 4/6 decision).
+- `pinia` is genuinely unused today (no `createPinia()`/`defineStore` call anywhere) but was deliberately added in Phase 6 to keep the `vue-router@5` dependency graph consistent; its real wiring (if any) is Phase 8 territory, not Phase 7's.
+
+Per standing decision 6, "dead is proven by tooling + tests, not guessed" — this is also why `vue-router`/`pinia` were left alone rather than removed on a tooling guess that conflicts with known framework behavior and prior-phase decisions.
+
+**Structural realignment considered, no action taken:**
+- Laravel 13 keeps the streamlined application skeleton Laravel 11 introduced (`bootstrap/app.php` + `bootstrap/providers.php`, no `app/Http/Kernel.php`/`app/Console/Kernel.php`) — this repo already uses exactly that structure (confirmed by reading `bootstrap/app.php`). No real mismatch exists to realign.
+- Nuxt 4's new default `srcDir` is `app/`, but this is the default for *newly scaffolded* projects only; Nuxt auto-detects and continues supporting the flat `pages/`/`components/`/`layouts/`/`plugins/` layout this repo already uses, and migration is explicitly optional (confirmed against Nuxt's own upgrade guidance). The current flat layout is already proven building and serving correctly under Nuxt 4 in Docker (Phase 5/6). Moving the tree into `app/` now would be speculative restyling with no present problem to solve — KISS/YAGNI (standing decision 7) says leave it.
+
 ### Changed — Phase 6 dependency upgrade (2026-11-18)
 
 - **BREAKING (dependency major, pre-approved by standing decision 1):** `laravel/framework` `^12.0` → `^13.0` (resolved `v13.43.0`). Clears `CVE-2026-114509` (Laravel TokenGuard auth bypass), which was in range at both the previously-locked `v11.31.0` and the manifest's own `^12.0` floor. No migration needed beyond the framework bump itself — the existing test suite passed unmodified.
