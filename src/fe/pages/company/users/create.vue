@@ -1,9 +1,9 @@
 ﻿<template>
   <v-card flat class="pa-4">
     <v-card-title class="d-flex align-center pe-2">
-      <v-icon icon="mdi-account-plus"></v-icon>
+      <v-icon icon="mdi-account-plus" />
       <span class="ml-2">Add Company User</span>
-      <v-spacer></v-spacer>
+      <v-spacer />
       <v-btn prepend-icon="mdi-keyboard-backspace" variant="outlined" color="primary" to="/company/users">Back</v-btn>
     </v-card-title>
 
