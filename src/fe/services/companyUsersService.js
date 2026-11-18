@@ -30,3 +30,7 @@ export const importCompanyUsers = (file) => {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 }
+
+export const getCompanyUserAudit = (fin, params = {}) => {
+  return useNuxtApp().$axiosApiClient.get(`/company/users/${fin}/audit`, { params })
+}
