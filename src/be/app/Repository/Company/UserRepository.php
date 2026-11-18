@@ -9,6 +9,21 @@ class UserRepository implements UserRepositoryInterface
 {
     public function index($search = null, $perPage = 15)
     {
+        return $this->buildSearchQuery($search)->paginate((int) $perPage);
+    }
+
+    public function all($search = null): \Illuminate\Support\LazyCollection
+    {
+        return $this->buildSearchQuery($search)->cursor();
+    }
+
+    /**
+     * Shared search-filter builder used by both the paginated index() and
+     * the unpaginated all() (CSV export) — keeps the LIKE/ILIKE logic in
+     * exactly one place (DRY).
+     */
+    private function buildSearchQuery($search = null)
+    {
         $query = User::query();
 
         if (!empty($search)) {
@@ -23,7 +38,7 @@ class UserRepository implements UserRepositoryInterface
             });
         }
 
-        return $query->orderBy('surname')->paginate((int) $perPage);
+        return $query->orderBy('surname');
     }
 
     public function getByFin($fin)

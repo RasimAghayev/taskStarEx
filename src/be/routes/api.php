@@ -8,4 +8,6 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+Route::get('/company/users/export', [UserController::class, 'export']);
+
 Route::apiResource('/company/users', UserController::class);

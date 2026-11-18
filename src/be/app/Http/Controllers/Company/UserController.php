@@ -27,6 +27,33 @@ class UserController extends Controller
         return UserResource::collection($data)->additional(['success' => true]);
     }
 
+    public function export(Request $request)
+    {
+        $search = $request->query('search');
+        $rows = $this->userRepository->all($search);
+        $filename = 'company-users-'.now()->format('Ymd_His').'.csv';
+
+        return response()->streamDownload(function () use ($rows) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, ['fin', 'name', 'surname', 'father', 'dob', 'email', 'status', 'status_label']);
+
+            foreach ($rows as $user) {
+                fputcsv($handle, [
+                    $user->fin,
+                    $user->name,
+                    $user->surname,
+                    $user->father,
+                    $user->dob?->format('Y-m-d'),
+                    $user->email,
+                    $user->status?->value,
+                    $user->status?->description(),
+                ]);
+            }
+
+            fclose($handle);
+        }, $filename, ['Content-Type' => 'text/csv']);
+    }
+
     public function store(StoreUserRequest $request)
     {
         $details = $request->validated();
