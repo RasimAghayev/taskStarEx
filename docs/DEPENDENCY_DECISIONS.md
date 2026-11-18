@@ -76,3 +76,121 @@
   as a Phase 8B-approved feature), re-add it then with a fresh decision
   entry here — this is not a "never again" ban, just a "not now, absent a
   real reason" call.
+
+## laravel/sanctum (`src/be`) — added Phase 9, 2026-11-18
+
+- **What it is**: Laravel's own first-party, officially-maintained package
+  for lightweight API authentication — personal-access tokens (what this
+  repo uses) and, separately, SPA cookie-session auth (not used here).
+- **Why needed now**: `docs/TECHNICAL_DEBT.md` P1-1 — every
+  `/api/company/users/*` route (full PII: name/surname/father/dob/email,
+  fully CRUD-able) had **zero** authentication. Phase 9's explicit mandate
+  is to close this P0 finding for real. Token-based, not SPA/cookie auth,
+  per the orchestrator directive: this is a plain JSON API with no
+  same-site frontend session requirement today.
+- **What it overlaps with / replaces**: nothing already present — this
+  repo had no authentication mechanism of any kind (the default Laravel
+  `users`/`password_reset_tokens`/`sessions` scaffold exists but is inert,
+  per `docs/TECHNICAL_DEBT.md` P2-3/Phase 7-8 notes; it provided no actual
+  enforcement). Writing a hand-rolled token scheme instead of using
+  Sanctum was considered and rejected — that would be reinventing a
+  first-party, already-audited mechanism for zero benefit (KISS).
+- **Maintenance status**: first-party Laravel package
+  (`github.com/laravel/sanctum`), actively maintained in lockstep with the
+  framework. Latest stable `4.5.0` (verified live against the Packagist
+  registry at run time, per standing decision 1), compatible with the
+  `laravel/framework ^13.0` already in use.
+- **License**: MIT.
+- **Known vulnerabilities**: none — `composer audit --locked` (run inside
+  the real `composer:2.11.2` container against the actual worktree lock)
+  reports "No security vulnerability advisories found" after this addition.
+- **Size**: small — one new migration (`personal_access_tokens`), one
+  trait (`HasApiTokens`) on `App\Models\User`, no new runtime services.
+- **Standard library equivalent**: none — PHP/Laravel has no built-in API
+  token mechanism; this is a legitimate, minimal third-party need.
+
+## larastan/larastan (`src/be`, dev-only) — added Phase 9, 2026-11-18
+
+- **What it is**: a Laravel-aware extension for PHPStan (static analysis —
+  catches type errors, undefined methods/properties, dead code paths
+  before runtime).
+- **Why needed now**: this repo had zero static-analysis tooling (only
+  `laravel/pint`, a style formatter, not a correctness checker). Per
+  CLAUDE.md's Phase 9 checklist: "add quality tooling that fits the
+  stack." Laravel + PHPStan is the de-facto standard pairing; Larastan
+  specifically understands Eloquent/facade magic that plain PHPStan
+  misparses.
+- **What it overlaps with / replaces**: nothing — `laravel/pint` is
+  formatting-only (whitespace/style), not type/correctness analysis; the
+  two are complementary, not duplicative.
+- **Maintenance status**: actively maintained
+  (`github.com/larastan/larastan`, the successor name to the older
+  `nunomaduro/larastan`). Latest stable `3.15.x` (verified live against
+  Packagist at run time), requires PHPStan `^2.0`, which it pulls in as
+  its own dependency — compatible with the installed PHP `^8.4`/Laravel
+  `^13.0`.
+- **License**: MIT.
+- **Known vulnerabilities**: none — confirmed via the same
+  `composer audit --locked` run above (dev-only, never shipped in the
+  `runtime` Docker stage, which installs `--no-dev`).
+- **Size**: dev-only dependency, zero runtime/production footprint.
+- **Standard library equivalent**: none.
+- **Verification**: `phpstan.neon.dist` (level 5, `paths: [app]`) run via
+  `make stan` → initial run found 18 real findings (all genuine Larastan/
+  Laravel-ecosystem gaps, not false suppressions): `JsonResource`
+  dynamic-property access needing `@mixin` annotations
+  (`UserResource`/`UserAuditLogResource`), the stock `App\Models\User`
+  skeleton's `$fillable`/`$hidden` docblock type not matching the
+  framework base class's `list<string>` typing, and one enum (`UserStatus`)
+  whose `description()` method only exists via `__call()`/reflection and
+  needed a `@method` annotation. All fixed with annotations/typed
+  docblocks only — zero runtime behavior change (re-verified: `make verify`
+  green after). Re-run: `[OK] No errors`.
+
+## eslint + @nuxt/eslint (`src/fe`, dev-only) — added Phase 9, 2026-11-18
+
+- **What it is**: `eslint` is the standard JS/TS linter; `@nuxt/eslint` is
+  Nuxt's own first-party module that generates a flat ESLint config aware
+  of Nuxt's file conventions (auto-imports, pages/, layouts/, middleware/)
+  plus Vue 3 template rules, so the project doesn't hand-roll one.
+- **Why needed now**: `docs/TECHNICAL_DEBT.md` P1-4 flagged zero frontend
+  quality tooling of any kind. Per CLAUDE.md's Phase 9 checklist: "add
+  quality tooling that fits the stack." This is the standard pairing for
+  a Nuxt 4 app (Nuxt's own scaffolding/docs recommend `@nuxt/eslint`
+  directly).
+- **What it overlaps with / replaces**: nothing already present (zero
+  frontend lint/type-check tooling existed).
+- **Maintenance status**: `eslint` — the de-facto standard, extremely
+  actively maintained. `@nuxt/eslint` — first-party Nuxt team package.
+  Latest stable versions read live from the npm registry at run time:
+  `eslint@10.15.0`, `@nuxt/eslint@1.17.0`.
+- **License**: MIT (both).
+- **Known vulnerabilities**: `npm audit` (run inside the real
+  `node:26.13.1-alpine` container against the actual worktree lock) shows
+  52 high-severity findings post-install, **up from the pre-existing 41**
+  documented in `docs/TECHNICAL_DEBT.md` P1-5 — re-traced via the `via`
+  chain: all 52 are still the single, already-known, upstream-unfixed
+  `picomatch` ReDoS (`GHSA-fc5q-39xc-vjpf`), now duplicated across more
+  package names because ESLint's own toolchain transitively pulls in more
+  copies of the same vulnerable package. **Not a new vulnerability** —
+  confirmed zero new advisory titles appear (`npm audit --json`'s
+  `vulnerabilities[*].via[*].title` set is unchanged, just a larger count
+  of the same one). `docs/TECHNICAL_DEBT.md` P1-5 updated with this count.
+- **Size**: dev-only, zero production/runtime footprint (not part of the
+  `node.dockerfile` `runtime` stage, which copies only `.output/`).
+- **Standard library equivalent**: none.
+- **Verification**: `npm run lint` (via `make lint-fe`) — initial run
+  found 19 real findings (3 errors, 16 warnings), all genuine: 16
+  auto-fixable `vue/html-self-closing` style warnings (applied via
+  `eslint --fix`, zero behavior change); one real latent defect in
+  `layouts/default.vue` (a bare `<slot/>` template root, invalid per
+  `vue/no-multiple-template-root` — fixed by wrapping in a single `<div>`,
+  harmless since this file is confirmed unused by this app's actual
+  routing today — see `docs/TECHNICAL_DEBT.md` P3-7); and two
+  `vue/valid-v-slot` false positives on
+  Vuetify's own dotted data-table slot-name convention
+  (`#item.status_label`, `#item.actions` — eslint-plugin-vue misparses the
+  dot as an unsupported v-slot modifier rather than part of the literal
+  slot name), suppressed with a targeted, documented
+  `eslint-disable-next-line` comment each, not a blanket rule disable.
+  Re-run: 0 problems.
