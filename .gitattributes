@@ -1,0 +1,18 @@
+* text=auto
+
+*.sh text eol=lf
+.githooks/* text eol=lf
+
+*.blade.php diff=html
+*.css diff=css
+*.html diff=html
+*.md diff=markdown
+*.php diff=php
+*.vue diff=html
+*.ts linguist-language=TypeScript
+*.js linguist-language=JavaScript
+
+/.github export-ignore
+/docs export-ignore
+/.githooks export-ignore
+CHANGELOG.md export-ignore
