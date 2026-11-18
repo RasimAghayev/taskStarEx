@@ -21,3 +21,12 @@ export const deleteCompanyUser = (fin) => {
 export const exportCompanyUsers = (params = {}) => {
   return useNuxtApp().$axiosApiClient.get('/company/users/export', { params, responseType: 'blob' })
 }
+
+export const importCompanyUsers = (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+
+  return useNuxtApp().$axiosApiClient.post('/company/users/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
