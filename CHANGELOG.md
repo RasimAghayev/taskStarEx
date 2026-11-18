@@ -8,6 +8,47 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Added — Phase 8B feature enhancement (2026-11-18, Gate 12 approved)
+
+- **CSV export of the company user list.** `GET /api/company/users/export`
+  (accepts the same `search` query parameter as the existing `index()`
+  endpoint, no page cap) streams every matching row as
+  `fin,name,surname,father,dob,email,status,status_label` via Laravel's
+  built-in `response()->streamDownload()` — no new dependency. Frontend:
+  an "Export CSV" button on `company/users/index.vue`'s toolbar. See
+  `projects/info/state/handoff/8B/taskStarEx.md` for the full acceptance
+  criteria and verification evidence.
+- **CSV bulk import of company users.** `POST /api/company/users/import`
+  (multipart `file`) accepts a CSV with the exact header
+  `fin,name,surname,father,dob,email,status` and validates every row with
+  the same rules `StoreUserRequest` already enforces for a single create
+  — no duplicated validation logic. A structurally wrong header is
+  rejected up front (422) before any row is touched; once the header is
+  accepted, a bad row (failed validation, in-file duplicate `fin`/email,
+  or duplicate against an existing row) is reported per row with its row
+  number and message and does not abort the batch — the response is
+  `{created, failed, errors[]}`. Frontend: an "Import CSV" button on
+  `company/users/index.vue`'s toolbar with an inline results panel. See
+  `projects/info/state/handoff/8B/taskStarEx.md` for the full acceptance
+  criteria and verification evidence.
+- **Change-history / audit log on company users.** Every `create`/`update`/
+  `delete` on a `company_users` row now writes exactly one row to the new
+  `company_user_audit_logs` table (`fin, action, changes (JSON), performed_by,
+  created_at`) via a Laravel model observer (`App\Observers\Company\UserAuditObserver`,
+  registered on `App\Models\Company\User`) — `UserController`/`UserRepository`
+  are completely unchanged. `changes` records only the fields that actually
+  changed on an update (old/new), and the full field snapshot on create/delete.
+  Deliberately **no foreign key** to `company_users.fin`, so a deleted user's
+  history survives the hard delete that removed it. `performed_by` is left
+  `null` for now — no authentication exists yet (Phase 9's job); Phase 9
+  backfills it going forward once real auth lands. An audit-write failure is
+  caught and logged, never allowed to block or roll back the business
+  operation it observes. New read-only `GET /api/company/users/{fin}/audit`
+  (paginated, newest first) keeps working after the parent row is deleted.
+  Frontend: a read-only "History" panel on the edit page. See
+  `projects/info/state/handoff/8B/taskStarEx.md` for the full acceptance
+  criteria and verification evidence.
+
 ### Changed — Phase 8 architecture (2026-11-18)
 
 - `src/be/app/Policies/Company/UserPolicy.php`: fixed — every one of its 7

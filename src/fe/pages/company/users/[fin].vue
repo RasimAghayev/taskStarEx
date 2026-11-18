@@ -27,11 +27,30 @@
       <v-btn color="primary" type="submit" :loading="saving">Save</v-btn>
       <v-btn class="ml-2" variant="text" to="/company/users">Cancel</v-btn>
     </v-form>
+
+    <v-divider class="my-6"></v-divider>
+
+    <div class="d-flex align-center mb-2">
+      <v-icon icon="mdi-history" size="small"></v-icon>
+      <span class="ml-2 text-subtitle-1">History</span>
+    </div>
+    <v-alert v-if="auditError" type="error" variant="tonal" density="compact" class="mb-2">{{ auditError }}</v-alert>
+    <v-list v-else lines="two" density="compact">
+      <v-list-item v-if="loadingAudit">Loading history...</v-list-item>
+      <v-list-item v-else-if="auditEntries.length === 0">No recorded changes yet.</v-list-item>
+      <v-list-item v-for="entry in auditEntries" :key="entry.id">
+        <v-list-item-title>
+          <v-chip size="x-small" class="mr-2" :color="actionColor(entry.action)">{{ entry.action }}</v-chip>
+          {{ entry.created_at }}
+        </v-list-item-title>
+        <v-list-item-subtitle>{{ changedFieldsSummary(entry) }}</v-list-item-subtitle>
+      </v-list-item>
+    </v-list>
   </v-card>
 </template>
 
 <script>
-import { getCompanyUser, updateCompanyUser } from '~/services/companyUsersService'
+import { getCompanyUser, getCompanyUserAudit, updateCompanyUser } from '~/services/companyUsersService'
 import { USER_STATUS_OPTIONS } from '~/constants/userStatus'
 
 export default {
@@ -52,6 +71,9 @@ export default {
       },
       statusItems: USER_STATUS_OPTIONS,
       req: (v) => !!v || 'Required',
+      loadingAudit: true,
+      auditEntries: [],
+      auditError: '',
     }
   },
   computed: {
@@ -61,6 +83,7 @@ export default {
   },
   async mounted() {
     await this.loadUser()
+    await this.loadAudit()
   },
   methods: {
     async loadUser() {
@@ -83,6 +106,32 @@ export default {
       } finally {
         this.loadingData = false
       }
+    },
+    async loadAudit() {
+      this.loadingAudit = true
+      this.auditError = ''
+      try {
+        const response = await getCompanyUserAudit(this.fin)
+        this.auditEntries = response.data?.data || []
+      } catch (e) {
+        this.auditError = e?.response?.data?.message || 'Failed to load history'
+      } finally {
+        this.loadingAudit = false
+      }
+    },
+    actionColor(action) {
+      return { created: 'success', updated: 'info', deleted: 'error' }[action] || 'blue-grey'
+    },
+    changedFieldsSummary(entry) {
+      if (entry.action === 'updated') {
+        return Object.entries(entry.changes || {})
+          .map(([field, diff]) => `${field}: ${diff.old} -> ${diff.new}`)
+          .join(', ')
+      }
+
+      return Object.entries(entry.changes || {})
+        .map(([field, value]) => `${field}: ${value}`)
+        .join(', ')
     },
     async saveUser() {
       const valid = await this.$refs.formRef?.validate?.()
