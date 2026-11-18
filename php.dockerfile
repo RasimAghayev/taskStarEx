@@ -73,8 +73,24 @@ RUN composer dump-autoload --optimize --no-dev \
     && mkdir -p storage/framework/cache storage/framework/sessions storage/framework/views storage/logs bootstrap/cache \
     && chown -R www-data:www-data storage bootstrap/cache
 
+# Phase 9 fix (docs/TECHNICAL_DEBT.md pre-existing defect): `pgrep -x
+# php-fpm` always reported unhealthy because this image has no `procps`,
+# which blocked the compose health-gate nginx depends on. php-fpm has no
+# native HTTP listener (it only speaks FastCGI on :9000), so the fix is a
+# real FastCGI request to the app's own /health/live route via cgi-fcgi
+# (libfcgi-bin), not adding procps back for a check that never asked
+# whether the app actually works.
+RUN apt-get update && apt-get install -y --no-install-recommends libfcgi-bin \
+    && rm -rf /var/lib/apt/lists/*
+
 USER www-data
 EXPOSE 9000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD pgrep -x php-fpm > /dev/null || exit 1
+    CMD SCRIPT_FILENAME=/var/www/html/be/public/index.php \
+        SCRIPT_NAME=/index.php \
+        REQUEST_METHOD=GET \
+        REQUEST_URI=/health/live \
+        QUERY_STRING= \
+        SERVER_SOFTWARE=healthcheck \
+        cgi-fcgi -bind -connect 127.0.0.1:9000 2>/dev/null | grep -q '"status":"ok"' || exit 1
 ENTRYPOINT ["php-fpm"]

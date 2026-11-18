@@ -8,6 +8,162 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Security — Phase 9 hardening (2026-11-18)
+
+- **P0 fixed: real authentication + authorization on every
+  `/api/company/users/*` route** (full PII, previously reachable
+  unauthenticated by anyone — `docs/TECHNICAL_DEBT.md` P1-1). Added
+  `laravel/sanctum` `^4.5` (resolved `v4.5.0`), token-based (not SPA/
+  cookie); `POST /api/login` / `POST /api/logout` / `GET /api/user`
+  added; every `/api/company/users/*` route (CRUD + the Phase 8B export/
+  import/audit additions) now requires `auth:sanctum`.
+  `App\Policies\Company\UserPolicy` (fixed fail-closed in Phase 8,
+  ADR-0001) now wired for real via `$this->authorize()` in every
+  `UserController`/`UserAuditController` action — single-authenticated-
+  actor model (every real method returns `true`; this app has no role/
+  ownership concept to encode a finer rule against, per KISS/YAGNI). See
+  `docs/adr/0004-wire-authentication-and-authorization.md`.
+- `App\Observers\Company\UserAuditObserver`: `performed_by` now populated
+  (`auth('sanctum')->user()?->email`) now that a real authenticated actor
+  exists — was `null` for every row before this phase.
+- `config/cors.php` published (`docs/TECHNICAL_DEBT.md` P2-9, previously
+  undocumented engine defaults): env-driven `allowed_origins`
+  (`CORS_ALLOWED_ORIGINS`, default the dev Nuxt container's port), not a
+  wildcard; `supports_credentials: false` (bearer-token auth, not
+  cookies).
+- Rate limiting added — **none existed before this phase**: a general
+  `api` limiter (60/min, `bootstrap/app.php`'s `throttleApi()`), a
+  tighter `login` limiter (5/min per IP, brute-force target), and an
+  `import` limiter (10/min per authenticated user, CSV bulk-write
+  surface) — `App\Providers\AppServiceProvider::configureRateLimiting()`.
+- CSV-injection (formula-injection) defenses added on both Phase 8B CSV
+  endpoints (`App\Support\Csv\CsvSafety`, new): `GET
+  /api/company/users/export` now sanitizes any cell starting with
+  `=`/`+`/`-`/`@`/tab/CR (prefixes `'`) before writing it; `POST
+  /api/company/users/import` **rejects** (does not silently rewrite) any
+  row with such a value in any column, since mutating submitted data on
+  the way in would be a correctness bug, not a safety fix.
+  `email`'s local-part may legitimately start with `+`/`-` per RFC
+  5321/5322 and still pass Laravel's own `email` validation rule, which
+  is why this check is field-agnostic.
+- `App\Http\Requests\Company\ImportUsersRequest`: upload hardening —
+  `max:5120` (5 MB) and `mimes:csv,txt` + content-sniffed
+  `mimetypes:text/csv,text/plain,application/csv,application/vnd.ms-excel`
+  (neither existed before this phase; previously any file of any size/
+  type was accepted and only failed later on CSV parsing).
+
+### Added — Phase 9 hardening (2026-11-18)
+
+- `GET /health/live` and `GET /health/ready` (liveness/readiness,
+  registered outside the `web`/`api` middleware groups in
+  `bootstrap/app.php`, same convention as Laravel's built-in `/up`).
+  `/health/ready` checks the database connection (`DB::select('select 1')`)
+  and returns 503 on failure, logging the exception.
+- `openapi.yaml` (repo root): full current API surface, including every
+  Phase 8B endpoint and the new auth/health routes.
+- `src/be/phpstan.neon.dist` + `make stan` (Larastan, level 5) — this
+  repo had zero static-analysis tooling before this phase (only
+  formatting via `laravel/pint`). Initial run found 18 real findings
+  (all genuine Larastan/Laravel-ecosystem annotation gaps, zero
+  behavior change to fix): `@mixin` annotations on `UserResource`/
+  `UserAuditLogResource` (a `JsonResource`'s dynamic property proxying
+  is otherwise invisible to static analysis), `@property` docblocks on
+  `App\Models\Company\User`/`UserAuditLog`, a `@method` annotation on
+  `App\Enums\UserStatus` for its reflection-based `description()`, and
+  a `list<string>` docblock correction on the stock
+  `App\Models\User::$fillable`/`$hidden`. Re-run: 0 errors.
+- `src/fe`: `@nuxt/eslint` `^1.17.0` + `eslint` `^10.15.0`, `eslint.config.mjs`,
+  `npm run lint` / `make lint-fe` — zero frontend lint tooling existed
+  before this phase. Initial run found 19 real findings (3 errors, 16
+  warnings): 16 auto-fixable `vue/html-self-closing` style warnings
+  (applied via `eslint --fix`); `src/fe/layouts/default.vue`'s bare
+  `<slot/>` template root (invalid per `vue/no-multiple-template-root`,
+  fixed by wrapping in one `<div>`; this file is confirmed dead code,
+  see `docs/TECHNICAL_DEBT.md` P3-7 — not removed, out of this phase's
+  scope); two targeted, documented `eslint-disable-next-line` comments
+  for a known `eslint-plugin-vue` false positive on Vuetify's dotted
+  data-table slot names (`#item.status_label`, `#item.actions`).
+  See `docs/DEPENDENCY_DECISIONS.md` for both new-dependency entries.
+- Minimal frontend auth wiring so the existing SPA stays usable now that
+  the backend requires a token: `src/fe/pages/login.vue`,
+  `src/fe/services/authService.js`, a bearer-token request interceptor
+  + 401 handler in `src/fe/plugins/axiosApiClient.ts`, a client-side
+  route guard (`src/fe/middleware/auth.global.js` — UX convenience only,
+  the real enforcement is server-side), and a sign-out action in
+  `app.vue`'s nav drawer.
+- Structured logging: failed login attempts and successful login/logout
+  (`App\Http\Controllers\Auth\AuthController`), readiness-check database
+  failures (`HealthController`), and CSV import completion with its
+  per-row created/failed counts (`UserController::import()` — row-level
+  messages deliberately omitted from the log, since they may contain
+  user-submitted values).
+- Tests: `CompanyUserAuthorizationTest` (one unauthenticated-401
+  assertion per `/company/users/*` route), `AuthApiTest` (login success/
+  failure/validation/rate-limit, `/user`, logout token revocation),
+  `HealthEndpointTest`, `CsvSafetyTest` (unit), a formula-injection-
+  rejection test in `CompanyUserImportTest`, and a `performed_by`
+  population test in `CompanyUserAuditLogTest`. Every pre-existing test
+  that calls a now-protected route updated to authenticate via
+  `Sanctum::actingAs()` (`tests/TestCase::actingAsApiUser()`).
+
+### Fixed — Phase 9 hardening (2026-11-18)
+
+- `php.dockerfile`'s runtime `HEALTHCHECK` always reported unhealthy
+  (`pgrep -x php-fpm`, but the image has no `procps`), silently blocking
+  `docker-compose.yml`'s `nginx` service (`depends_on: php: condition:
+  service_healthy`) from ever starting even though php-fpm was actually
+  running fine. Replaced with a real FastCGI request to `/health/live`
+  via `cgi-fcgi` (`libfcgi-bin`) — proves the app actually answers a
+  request, not just that a process exists. See `docs/TECHNICAL_DEBT.md`
+  P2-10.
+- **Real 500 found by this phase's own manual Docker smoke test** (not
+  by the test suite — every existing test uses `getJson()`/`postJson()`,
+  which always send `Accept: application/json`): an unauthenticated
+  request to any `/api/company/users/*` route made without that header
+  crashed with `RouteNotFoundException: Route [login] not defined`
+  instead of returning 401. Cause: Laravel's own
+  `Illuminate\Foundation\Configuration\ApplicationBuilder` registers a
+  default guest-redirect callback (`Authenticate::redirectUsing(fn () =>
+  route('login'))`) regardless of app-level config, and this app — a
+  pure Sanctum-token JSON API with no web/session guard — has no
+  `login`-named route for it to resolve. Fixed in `bootstrap/app.php`:
+  `$middleware->redirectGuestsTo(fn () => null)` removes the crash, and
+  a `$exceptions->render()` callback for `AuthenticationException`
+  guarantees the same `{"success":false,"message":"Unauthenticated."}`
+  JSON 401 regardless of the caller's `Accept` header. In
+  `APP_DEBUG=true` this bug also leaked a full framework stack-trace
+  page (Ignition) to an unauthenticated caller — an information-
+  disclosure risk on top of the availability one. Regression test:
+  `CompanyUserAuthorizationTest::test_index_requires_authentication_even_without_an_accept_json_header`
+  (uses plain `get()`, not `getJson()`). Verified against the real
+  running stack (`docker compose up`, real `curl`, no test-harness
+  shortcuts): unauthenticated → 401, login → token, authenticated → 200,
+  logout → 200, reused revoked token → 401.
+- Three real `docker build --target test` failures found and fixed, none
+  by weakening or skipping a test:
+  - `CsvSafetyTest`'s `@dataProvider` PHPDoc annotation is silently
+    ignored by PHPUnit 13 (PHPDoc-based test metadata was removed, not
+    merely deprecated) — the test ran with 0 arguments instead of 6.
+    Fixed with the `#[DataProvider('triggerCharacterProvider')]`
+    attribute, the only mechanism this PHPUnit version supports.
+  - `AuthApiTest::test_logout_revokes_the_current_token` failed because
+    `Illuminate\Auth\AuthManager` caches a resolved guard per name for
+    its own lifetime, and `Illuminate\Auth\RequestGuard` caches the user
+    it resolves on first use — both caches live on objects that, in real
+    production, exist for exactly one HTTP request (PHP-FPM boots a
+    fresh container per request), but are shared across the test
+    method's several simulated `postJson()`/`getJson()` calls. Fixed in
+    the test only (`Auth::forgetGuards()` between the logout call and
+    the final assertion) — not a production bug; confirmed separately by
+    the real multi-request smoke test above that token revocation
+    genuinely works outside the test harness.
+  - `HealthEndpointTest`'s DB-unreachable test failed with a Mockery
+    `BadMethodCallException` on `getConnections()` — Laravel's own test
+    teardown (`disconnectDatabaseConnections()`) calls that method on
+    whatever `db` resolves to, which after `DB::shouldReceive(...)` is
+    the same partial mock, so it needs its own expectation too. Fixed by
+    adding `DB::shouldReceive('getConnections')->andReturn([])`.
+
 ### Added — Phase 8B feature enhancement (2026-11-18, Gate 12 approved)
 
 - **CSV export of the company user list.** `GET /api/company/users/export`

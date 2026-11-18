@@ -1,9 +1,9 @@
 <template>
   <v-card flat class="pa-4">
     <v-card-title class="d-flex align-center pe-2">
-      <v-icon icon="mdi-account-edit"></v-icon>
+      <v-icon icon="mdi-account-edit" />
       <span class="ml-2">Edit Company User</span>
-      <v-spacer></v-spacer>
+      <v-spacer />
       <v-btn prepend-icon="mdi-keyboard-backspace" variant="outlined" color="primary" to="/company/users">Back</v-btn>
     </v-card-title>
 
@@ -28,10 +28,10 @@
       <v-btn class="ml-2" variant="text" to="/company/users">Cancel</v-btn>
     </v-form>
 
-    <v-divider class="my-6"></v-divider>
+    <v-divider class="my-6" />
 
     <div class="d-flex align-center mb-2">
-      <v-icon icon="mdi-history" size="small"></v-icon>
+      <v-icon icon="mdi-history" size="small" />
       <span class="ml-2 text-subtitle-1">History</span>
     </div>
     <v-alert v-if="auditError" type="error" variant="tonal" density="compact" class="mb-2">{{ auditError }}</v-alert>
