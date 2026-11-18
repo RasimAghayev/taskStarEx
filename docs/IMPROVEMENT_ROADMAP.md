@@ -4,7 +4,7 @@
 
 ## Critical path (must happen in this order)
 
-1. **Phase 4** — git/PR hygiene, including closing/reconfiguring the open `vue-router-5.x` PR (#67) so Renovate stops re-proposing a blocked bump, and untracking `.vscode/settings.json`.
+1. **Phase 4** — git/PR hygiene, including triaging the open `vue-router-5.x` PR (#67) and untracking `.vscode/settings.json`. **2026-11-18 update:** #67 was merged directly by the repo owner before this plan's Phase 4 pass started, and the owner has since confirmed v5 as the intentional direction (not reverted) — see `docs/TECHNICAL_DEBT.md` P1-2 and the standing-decision-1 blocker record. Step 2 below is updated accordingly.
 2. **Phase 6, step 0** — regenerate both lockfiles (`composer update laravel/framework laravel/tinker`; `npm install`/`update` in `src/fe`) so manifest and lock actually agree. **Nothing else in Phase 6 should proceed before this**, since every "current version" claim in `projects/info/deps/taskStarEx.md` is conditional on it.
 3. **Phase 6, step 1** — Laravel framework to `>=12.68.0` or `>=13.27.0` (clears `CVE-2026-114509` for real; a plain "any 12.x" does not).
 4. **Phase 5** — Docker baseline fix (multi-stage `php.dockerfile` with a real install + test stage; multi-stage `node.dockerfile`) — needed before any phase can honestly claim "verified in Docker" for this repo.
@@ -16,12 +16,12 @@ Everything else (frontend tests, dead-code removal, docs, CI expansion) can proc
 
 - Full-history gitleaks audit (this Phase 3 pass only covered the working tree, per the orchestrator's directive — expected clean, must still be run properly).
 - Triage all 4 open PRs:
-  - `#67` (`renovate/vue-router-5.x`) — close; reconfigure Renovate to stop proposing the 5.x line (ignore rule or explicit pin) until the Vuex→Pinia migration referenced in `docs/TECHNICAL_DEBT.md` is separately approved. Likely a Gate 11 case if judged permanently abandoned.
+  - `#67` (`renovate/vue-router-5.x`) — **superseded by events:** the repo owner merged this directly to `master` on 2026-11-17, before this Phase 4 pass started. Not a triage action; see `docs/TECHNICAL_DEBT.md` P1-2/P2-7. The owner's follow-on decision (2026-11-18, keep v5) also closed Renovate's resulting revert proposal, `#69`.
   - `#66` (`renovate/laravel-tinker-2.x`) — investigate the unconfirmed churn cause with a real install; merge if clean, close with a documented reason otherwise.
   - `#27` / `#20` (2024-vintage Dependabot PRs) — almost certainly superseded by the Phase 6 upgrade; close as stale with a note, or let a fresh Dependabot run (post Phase 10) supersede them naturally.
 - `git rm --cached .vscode/settings.json`; confirm `.gitignore` already covers it going forward (it does).
 - Stand up the 3-branch model (`main`/`test`/`preview`) — `preview` doesn't exist yet for this repo (expected, this phase creates it).
-- `master`→`main` default-branch rename — **Gate 4**, bundle the approval ask with this Gate 10 presentation per the established precedent in `APPROVALS.md`.
+- `master`→`main` default-branch rename — **Gate 4**, bundle the approval ask with this Gate 10 presentation per the established precedent in `APPROVALS.md`. **2026-11-18: approved and executed** — `main` verified content-identical to `master` (tree-hash match after a PR-based fast-forward sync, PR #75), set as the GitHub default branch, CI workflow triggers repointed, `master` deleted post-mirror-refresh.
 - Acceptance: gitleaks full-history exit 0 or findings triaged; 0 stale open PRs remaining unaddressed; `.vscode/settings.json` no longer tracked; 3-branch model in place.
 
 ## Phase 5 — Containerization baseline
@@ -45,7 +45,7 @@ Everything else (frontend tests, dead-code removal, docs, CI expansion) can proc
 | 3 | PHP runtime off `^8.2` | Ahead of its 2026-12-31 EOL. |
 | 4 | Dev-only Composer packages (pint, sail, mockery, collision, phpunit, spatie/laravel-ignition, fakerphp/faker) | Batch as one logical group, low risk. |
 | 5 | `nuxt` 3→4 major | Now that the lock genuinely matches the manifest. Explicitly verify Vuetify 4 / `vite-plugin-vuetify` 2.x compatibility with Nuxt 4's Vite changes. |
-| 6 | `vue-router` | **Hold** at `^4.6.4`/`4.6.5` — see `docs/TECHNICAL_DEBT.md` written blocker. Do not attempt v5 here. |
+| 6 | `vue-router` | **No longer a hold — already on `^5.0.0`** (owner-merged `#67`, confirmed as the intentional direction 2026-11-18; see `docs/TECHNICAL_DEBT.md` P1-2). What this step actually needs to do: regenerate the `src/fe` lockfile with `pinia` declared and resolved (the manifest/lock pair for this bump was never actually reconciled), then verify. The Vuex→Pinia migration itself is real Phase 6/8 scope now, not a deferred maybe — plan it as its own tracked unit of work, not folded silently into this step. |
 | 7 | `vite` / `laravel-vite-plugin` (src/be asset pipeline) | Bump anyway despite the unfixed `picomatch` chain — document residual risk. |
 | 8 | Docker base images + CI action pins | Re-pin floating tags/actions by digest/SHA (shared with Phase 5/10). |
 | 9 | `.github/dependabot.yml` | Standing decision 14. |
@@ -88,7 +88,7 @@ Everything else (frontend tests, dead-code removal, docs, CI expansion) can proc
 - Pin `actions/checkout`/`shivammathur/setup-php` by commit SHA.
 - Add a dependency/image vulnerability-scan step (composer audit / npm audit / image scan), publish-on-tag only per the runner-time standard.
 - Add `.github/dependabot.yml` (weekly, Composer+npm+Docker+Actions, PR limits 10/5, commit prefixes per standing decision 14).
-- Update workflow branch triggers once `main` becomes default (depends on Phase 4's Gate 4 outcome).
+- Workflow branch triggers already repointed to `main` as part of Phase 4's Gate 4 execution (2026-11-18); re-verify still correct when Phase 10 does its own CI pass.
 - Acceptance: a PR touching only `src/fe` fails CI if it breaks lint/type-check/build; Dependabot opens its first PR under the new config within a week.
 
 ## Phase 11 — Tests
