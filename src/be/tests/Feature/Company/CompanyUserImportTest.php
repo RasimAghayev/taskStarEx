@@ -21,6 +21,7 @@ class CompanyUserImportTest extends TestCase
 
     public function test_all_valid_rows_are_imported(): void
     {
+        $this->actingAsApiUser();
         $csv = "fin,name,surname,father,dob,email,status\n".
             "IM11111,Ali,Aliyev,Vali,1990-01-01,ali.import@example.com,new_register\n".
             "IM22222,Veli,Veliyev,Hasan,1991-02-02,veli.import@example.com,it_works\n".
@@ -42,6 +43,7 @@ class CompanyUserImportTest extends TestCase
 
     public function test_mixed_file_reports_per_row_success_and_failure(): void
     {
+        $this->actingAsApiUser();
         User::factory()->create(['fin' => 'EXIST11', 'email' => 'existing@example.com']);
 
         $csv = "fin,name,surname,father,dob,email,status\n".
@@ -70,6 +72,7 @@ class CompanyUserImportTest extends TestCase
 
     public function test_in_file_duplicate_fin_is_reported_without_a_server_error(): void
     {
+        $this->actingAsApiUser();
         $csv = "fin,name,surname,father,dob,email,status\n".
             "DF11111,Ali,Aliyev,Vali,1990-01-01,df1@example.com,new_register\n".
             "DF11111,Second,Copy,Dad,1991-02-02,df2@example.com,it_works\n";
@@ -88,8 +91,35 @@ class CompanyUserImportTest extends TestCase
         $this->assertStringContainsString('Duplicate fin', $errors[0]['messages'][0]);
     }
 
+    public function test_a_row_with_a_formula_injection_prefix_is_rejected_not_imported(): void
+    {
+        $this->actingAsApiUser();
+
+        // '+' is a legal RFC 5321 email local-part character, so this row
+        // would otherwise pass StoreUserRequest's `email` validation --
+        // the CsvSafety check must catch it before that point, as a
+        // spreadsheet app would read a leading '+'/'='/'-'/'@' as the
+        // start of a formula.
+        $csv = "fin,name,surname,father,dob,email,status\n".
+            "CI11111,Ali,Aliyev,Vali,1990-01-01,+1234567@example.com,new_register\n";
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.created', 0)
+            ->assertJsonPath('data.failed', 1);
+
+        $this->assertDatabaseMissing('company_users', ['fin' => 'CI11111']);
+
+        $errors = $response->json('data.errors');
+        $this->assertStringContainsString("Field 'email' starts with", $errors[0]['messages'][0]);
+    }
+
     public function test_malformed_header_is_rejected_before_any_row_is_processed(): void
     {
+        $this->actingAsApiUser();
         $csv = "id,first_name,last_name\n1,Ali,Aliyev\n";
 
         $response = $this->post('/api/company/users/import', [
@@ -104,6 +134,7 @@ class CompanyUserImportTest extends TestCase
 
     public function test_empty_file_is_rejected(): void
     {
+        $this->actingAsApiUser();
         $response = $this->post('/api/company/users/import', [
             'file' => $this->csvFile(''),
         ]);

@@ -1,0 +1,15 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+
+    # Level 5: catches real correctness issues (wrong argument types, dead
+    # catch blocks, unreachable code, calling methods that don't exist) at
+    # a level a small, existing codebase can actually run clean on with
+    # real fixes, not framework-generic noise. Raising further is a
+    # deliberate future step, not something to force in one Phase 9 pass.
+    level: 5
+
+    tmpDir: storage/phpstan

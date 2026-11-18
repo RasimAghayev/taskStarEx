@@ -3,12 +3,20 @@
 namespace App\Models\Company;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Carbon;
 
 /**
  * An immutable, append-only audit row describing one change to a
  * company_users record. Deliberately has no relationship/foreign key back
  * to App\Models\Company\User -- a row must remain readable after the user
  * it describes has been hard-deleted.
+ *
+ * @property int $id
+ * @property string $fin
+ * @property string $action
+ * @property array<string, mixed> $changes
+ * @property string|null $performed_by
+ * @property Carbon|null $created_at
  */
 class UserAuditLog extends Model
 {

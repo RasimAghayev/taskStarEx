@@ -39,6 +39,7 @@ class CompanyUserAuditLogTest extends TestCase
 
     public function test_deleting_a_user_writes_a_deleted_audit_row_that_survives_the_hard_delete(): void
     {
+        $this->actingAsApiUser();
         $user = User::factory()->create(['fin' => 'AU33333', 'email' => 'au3@example.com']);
 
         $user->delete();
@@ -61,6 +62,7 @@ class CompanyUserAuditLogTest extends TestCase
 
     public function test_audit_endpoint_returns_newest_first_and_paginates(): void
     {
+        $this->actingAsApiUser();
         $user = User::factory()->create(['fin' => 'AU44444', 'status' => 'new_register']);
         $user->update(['status' => 'it_works']);
         $user->update(['status' => 'vacation']);
@@ -72,6 +74,27 @@ class CompanyUserAuditLogTest extends TestCase
         $this->assertSame('vacation', $response->json('data.0.changes.status.new'));
         $this->assertSame('it_works', $response->json('data.1.changes.status.new'));
         $this->assertSame(3, $response->json('meta.total'));
+    }
+
+    public function test_performed_by_is_populated_for_an_authenticated_http_write(): void
+    {
+        $actor = $this->actingAsApiUser();
+
+        $response = $this->postJson('/api/company/users', [
+            'fin' => 'AU66666',
+            'name' => 'Rasim',
+            'surname' => 'Aghayev',
+            'father' => 'Ilham',
+            'dob' => '1990-05-10',
+            'email' => 'performed-by@example.com',
+            'status' => 'new_register',
+        ]);
+
+        $response->assertCreated();
+
+        $log = UserAuditLog::where('fin', 'AU66666')->where('action', 'created')->first();
+        $this->assertNotNull($log);
+        $this->assertSame($actor->email, $log->performed_by);
     }
 
     public function test_an_audit_write_failure_does_not_block_the_underlying_business_operation(): void
