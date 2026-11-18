@@ -48,3 +48,31 @@
 - **Standard library equivalent**: none — Vue has no built-in global-store
   primitive comparable to Pinia/Vuex; this remains a legitimate third-party
   need for any app with cross-component shared state.
+
+## pinia (`src/fe`) — removed Phase 8, 2026-11-18 (addendum to the entry above)
+
+- **Re-verified independently this phase** (not trusting Phase 6/7's say-so
+  alone): `grep -rni "pinia|createPinia|defineStore|usePinia"` across
+  `src/fe` (excluding `node_modules`) — zero hits outside
+  `package.json`/`package-lock.json`; `nuxt.config.ts`'s `modules` array
+  does not register it either. Independently re-read `node_modules/vue-router/package.json`'s
+  own `peerDependenciesMeta` — confirms `pinia` is listed `"optional": true`,
+  not a hard peer-dependency failure, exactly as Phase 6/7 already found.
+- **Decision (ADR-0003, see `docs/adr/0003-remove-unused-pinia-dependency.md`):
+  removed.** `vue-router@5` installs and resolves cleanly without it
+  (optional peer, confirmed above); `vuex` was removed in Phase 7 as
+  dead-dependency-only (no store module ever existed to migrate — Phase 7
+  explicitly flagged this so no migration was assumed pending); there is no
+  concrete, present feature in this repo that needs cross-component shared
+  state today. Per standing decision 7 (KISS/YAGNI win conflicts) and the
+  Design Principles section's "don't design for a speculative future," kept
+  is not chosen without a real present justification, and none exists.
+  `npm uninstall pinia` run inside the exact `node:26.13.1-alpine` image
+  `node.dockerfile` uses, bind-mounted against the real worktree — diff
+  scoped to exactly `pinia` + 0 orphaned sub-dependencies (1 package
+  removed total). `npm audit` high-severity count unchanged (41, the
+  pre-existing unfixed-upstream `picomatch` chain) — no regression.
+- If a real, present need for client-side shared state appears later (e.g.
+  as a Phase 8B-approved feature), re-add it then with a fresh decision
+  entry here — this is not a "never again" ban, just a "not now, absent a
+  real reason" call.
