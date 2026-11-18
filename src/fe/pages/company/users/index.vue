@@ -1,9 +1,9 @@
 ﻿<template>
   <v-card flat>
     <v-card-title class="d-flex align-center pe-2 ga-2">
-      <v-icon icon="mdi-account-group"></v-icon>
+      <v-icon icon="mdi-account-group" />
       <span>Company User List</span>
-      <v-spacer></v-spacer>
+      <v-spacer />
       <v-btn
         prepend-icon="mdi-upload"
         variant="outlined"
@@ -20,7 +20,7 @@
         accept=".csv,text/csv"
         class="d-none"
         @change="importUsers"
-      />
+      >
       <v-btn
         prepend-icon="mdi-download"
         variant="outlined"
@@ -71,9 +71,11 @@
       item-value="fin"
       @update:options="loadItems"
     >
+      <!-- eslint-disable-next-line vue/valid-v-slot -- Vuetify's own dotted data-table slot-name convention (`item.<column>`); eslint-plugin-vue misparses the dot as an (unsupported) v-slot modifier rather than part of the literal slot name. -->
       <template #item.status_label="{ item }">
         <v-chip size="small" color="blue-grey">{{ item.status_label || item.status }}</v-chip>
       </template>
+      <!-- eslint-disable-next-line vue/valid-v-slot -- same Vuetify dotted-slot-name false positive as above. -->
       <template #item.actions="{ item }">
         <v-btn icon="mdi-pencil" variant="text" color="primary" :to="`/company/users/${item.fin}`" />
         <v-btn icon="mdi-delete" variant="text" color="error" @click="removeUser(item.fin)" />
