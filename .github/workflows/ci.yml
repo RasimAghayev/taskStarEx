@@ -8,7 +8,7 @@ name: CI
 #        -> Docker test stage (the repo's own, already-proven
 #           `docker build --target test`) -> dependency/advisory audit
 #        -> runtime-image build validation.
-# Nothing here publishes an image — see docs/TECHNICAL_DEBT.md P3-8 for the
+# Nothing here publishes an image — see docs/TECHNICAL_DEBT.md P3-9 for the
 # documented decision not to wire a GHCR publish-on-tag job for this repo.
 
 on:
@@ -158,7 +158,7 @@ jobs:
 
   # -------------------------------------------------------------------------
   # Stage 3: dependency/advisory audit (composer audit --locked, npm audit).
-  # Policy (evidence-based, see docs/TECHNICAL_DEBT.md P1-5 / P3-8):
+  # Policy (evidence-based, see docs/TECHNICAL_DEBT.md P1-5):
   #   - any composer advisory of severity critical/high (or with no severity
   #     field at all — FriendsOfPHP advisories often omit it; fail closed)
   #     blocks the job. Currently 0 advisories (verified: `composer audit
@@ -256,7 +256,7 @@ jobs:
   # -------------------------------------------------------------------------
   # Stage 4: validate the actual runtime images (the ones a real deployment
   # would use) still build. No push anywhere — see docs/TECHNICAL_DEBT.md
-  # P3-8 for why this repo does not publish to GHCR.
+  # P3-9 for why this repo does not publish to GHCR.
   # -------------------------------------------------------------------------
   docker-build-validate:
     needs: [changes, backend-test, frontend-test]
@@ -270,6 +270,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Provision .env for compose interpolation
+        run: make env
       - name: Validate docker-compose.yml
         run: docker compose config -q
       - name: Build php runtime image

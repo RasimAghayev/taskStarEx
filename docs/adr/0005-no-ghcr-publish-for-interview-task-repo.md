@@ -39,7 +39,7 @@ Evidence considered:
 ## Decision
 
 **Do not add a GHCR publish-on-tag workflow for this repo.** The
-`docs/TECHNICAL_DEBT.md` P3-8 entry (added this phase) and this ADR are the
+`docs/TECHNICAL_DEBT.md` P3-9 entry (added this phase) and this ADR are the
 documented judgment call the orchestrator directive asked for, in place of
 a publish pipeline nobody would use.
 
@@ -89,7 +89,7 @@ redesign.
 - No GHCR package is created for this repo. If one is later wanted, that is
   a new, explicit decision (and a new ADR superseding this one), not a
   silent drift.
-- `docs/TECHNICAL_DEBT.md` P3-8 cross-references this ADR so a future
+- `docs/TECHNICAL_DEBT.md` P3-9 cross-references this ADR so a future
   phase (or the owner) sees the reasoning without re-deriving it.
 
 ## Verification
