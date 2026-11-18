@@ -8,6 +8,38 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Changed — Phase 8 architecture (2026-11-18)
+
+- `src/be/app/Policies/Company/UserPolicy.php`: fixed — every one of its 7
+  methods had a `: bool` return type with no `return` statement at all
+  (would throw `TypeError` if ever invoked). Each now explicitly
+  `return false;` (fail-closed/deny-by-default placeholder; this repo has
+  no role/ownership model yet to encode a real rule, and this class is
+  still not wired into any route/controller — that remains Phase 9's job).
+  Also removed an unused `use Illuminate\Auth\Access\Response;` import.
+  Kept, not deleted — it already sits at Laravel's policy-auto-discovery
+  convention location for `App\Models\Company\User`, so Phase 9 can wire
+  it in with zero registration boilerplate. See `docs/adr/0001-fix-and-keep-userpolicy.md`.
+- `src/fe/pages/company/users/create.vue`, `src/fe/pages/company/users/[fin].vue`:
+  the identical, hand-duplicated 8-entry status dropdown (`statusItems`)
+  is now sourced from one new module, `src/fe/constants/userStatus.js`
+  (`USER_STATUS_OPTIONS`), instead of being declared twice. No behavior
+  change — the rendered options are byte-for-byte identical. See
+  `docs/adr/0002-status-option-list-shared-constant.md`.
+
+### Removed — Phase 8 architecture (2026-11-18)
+
+- `pinia` dependency (`src/fe`) — added in Phase 6 only to satisfy
+  `vue-router@5`'s *optional* peer dependency; independently re-confirmed
+  this phase (reading `vue-router`'s own `peerDependenciesMeta`) that it
+  is not actually required, and re-confirmed zero usage anywhere in the
+  codebase. No present feature needs client-side shared state. Removed
+  via `npm uninstall pinia` inside the exact `node:26.13.1-alpine` image
+  `node.dockerfile` uses — diff scoped to exactly 1 package, 0 orphaned
+  sub-dependencies. `npm audit` high-severity count unchanged (41,
+  pre-existing unfixed-upstream `picomatch`). See
+  `docs/adr/0003-remove-unused-pinia-dependency.md`.
+
 ### Removed — Phase 7 dead-code removal (2026-11-18)
 
 - `apache.dockerfile` + `server/apache/httpd-vhosts.conf` — confirmed unreferenced anywhere (CI, Makefile, `docker-compose.yml`, `Command.txt`, README) by Phase 2/3 and independently re-confirmed here by repo-wide grep. The real web server is the `nginx` service (`nginx.dockerfile` + `server/nginx/default.conf`). The two now-dangling `.dockerignore` entries for these paths were removed in the same commit.

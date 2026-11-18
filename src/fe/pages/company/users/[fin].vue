@@ -32,6 +32,7 @@
 
 <script>
 import { getCompanyUser, updateCompanyUser } from '~/services/companyUsersService'
+import { USER_STATUS_OPTIONS } from '~/constants/userStatus'
 
 export default {
   name: 'EditCompanyUser',
@@ -49,16 +50,7 @@ export default {
         email: '',
         status: 'new_register',
       },
-      statusItems: [
-        { title: 'Yeni Qeydiyyat', value: 'new_register' },
-        { title: 'İşləyir', value: 'it_works' },
-        { title: 'Məzuniyyət', value: 'vacation' },
-        { title: 'Analıq məzuniyyəti', value: 'maternity_leave' },
-        { title: 'Təhsil', value: 'education' },
-        { title: 'Ezamiyyət', value: 'business_trip' },
-        { title: 'Çıxıb', value: 'out' },
-        { title: 'Çıxarılıb', value: 'removed' },
-      ],
+      statusItems: USER_STATUS_OPTIONS,
       req: (v) => !!v || 'Required',
     }
   },

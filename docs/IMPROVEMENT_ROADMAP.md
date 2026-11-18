@@ -70,6 +70,13 @@ Everything else (frontend tests, dead-code removal, docs, CI expansion) can proc
 - Explicitly record: Repository pattern stays as-is (already proportionate); **no** DDD/EDA/hexagonal/modular-monolith layering is introduced — a single-entity CRUD interview-task app has no real complexity to justify it (KISS/YAGNI win, standing decision 7).
 - Acceptance: both ADRs written and checked in; no unjustified pattern introduced.
 
+**Done, 2026-11-18.** Three items decided, each with an ADR under `docs/adr/`:
+1. **`UserPolicy`** (ADR-0001) — fixed and kept, not deleted. Every method's missing-return bug fixed (`return false;`, fail-closed placeholder; no real role/ownership model exists yet to encode a real rule). Still not wired into any route/controller — that enforcement step is unchanged, still Phase 9's job.
+2. **Status-list duplication** (ADR-0002) — centralized into `src/fe/constants/userStatus.js` (`USER_STATUS_OPTIONS`); both `create.vue`/`[fin].vue` now import it. Consuming the backend's `status_label` was considered and rejected (that's a per-record display label, not a dropdown value/label list; a new API endpoint for a static 8-row list would be disproportionate complexity).
+3. **`pinia`** (ADR-0003) — removed. Independently re-confirmed unused and genuinely optional (`vue-router@5`'s own `peerDependenciesMeta`); no present feature needs client-side shared state. `vuex` was already removed in Phase 7; zero state-management libraries remain declared.
+- Repository pattern reaffirmed as-is (no restructuring). No DDD/EDA/hexagonal/modular-monolith layering introduced — see `docs/ARCHITECTURE.md`'s Phase 8 section for the one-line reason per skipped principle (SOLID, Clean/Hexagonal, DDD, EDA, Modular monolith, GoF all explicitly considered and declined).
+- Verification: `docker build --target test -f php.dockerfile .` exit 0, 8 tests/31 assertions unchanged from `docs/BASELINE.md`; `docker build --target test -f node.dockerfile .` exit 0, bundle produced; `make verify` exit 0 end-to-end; `npm audit` 41 high/0 critical unchanged (pre-existing `picomatch`).
+
 ## Phase 8B — Feature enhancement (Gate 12 required before implementation)
 
 - Propose (not pre-decided here): real auth+authorization on the CRUD endpoints (overlaps Phase 9), CSV export of the user list, an audit/activity log on `company_users` changes.
