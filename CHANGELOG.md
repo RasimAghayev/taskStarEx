@@ -8,6 +8,68 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### CI/CD — Phase 10 pipeline (2026-11-18)
+
+- **`.github/workflows/ci.yml` added, replacing the backend-only
+  `laravel.yml`.** Single consolidated pipeline covering both app roots,
+  per the cross-phase CI/CD runner-time standard:
+  - `changes` (path-filter, `dorny/paths-filter`): gates every job below
+    on whether `src/be`/`src/fe` actually changed — a frontend-only PR no
+    longer pays for a backend Docker build and vice versa.
+  - `backend-quality` / `frontend-quality` (parallel, cheap, first):
+    `pint --test` + Larastan (backend), `@nuxt/eslint` (frontend) — the
+    exact checks Phase 9 wired as `make lint`/`make stan`/`make lint-fe`,
+    run directly against `docker build --target build` (GitHub Actions
+    cache, `type=gha`, so layers are reused across jobs/runs rather than
+    rebuilt from scratch every time).
+  - `backend-test` / `frontend-test`: wire the already-proven
+    `docker build --target test` for `php.dockerfile`/`node.dockerfile`
+    (Phase 5/6/9's own Docker-first test stages) as real CI jobs — no
+    reinvented test runner.
+  - `backend-audit` / `frontend-audit`: `composer audit --locked` +
+    `npm audit` for both `src/be` and `src/fe`'s npm manifests. Policy:
+    any new critical/high finding blocks the job; the one standing
+    accepted-risk advisory (`GHSA-fc5q-39xc-vjpf`, picomatch ReDoS, no
+    upstream fix — `docs/TECHNICAL_DEBT.md` P1-5) is allow-listed by GHSA
+    ID so it does not perpetually fail CI; low/medium are reported only.
+  - `docker-build-validate`: builds all three `runtime`-target images
+    (`php`/`fe`/`nginx`) plus `docker compose config -q` — validates the
+    images a real deployment would use, without publishing anywhere (see
+    `docs/adr/0005-no-ghcr-publish-for-interview-task-repo.md`,
+    `docs/TECHNICAL_DEBT.md` P3-9).
+  - Hygiene: `concurrency`/`cancel-in-progress` on PRs; `timeout-minutes`
+    on every job; top-level `permissions: contents: read` (no job touches
+    secrets — none exist in this pipeline — so fork PRs are unaffected);
+    every new action pinned by resolved commit SHA
+    (`dorny/paths-filter@v4.0.3`, `docker/setup-buildx-action@v4.4.1`,
+    `docker/build-push-action@v7.4.0`, `actions/setup-node@v7.1.0`),
+    matching the existing `actions/checkout`/`shivammathur/setup-php`
+    pins already established in Phase 6.
+  - Triggers repointed to the 3-branch model: `pull_request`/`push` on
+    `preview`, `test`, and `main` (the old workflow only ran against
+    `main`, a leftover from before Phase 4 built the 3-branch model).
+- **`style(be)`: `./vendor/bin/pint` fix applied once** (18 pre-existing
+  style violations across 64 files, found only because this phase wired
+  `pint --test` into CI for the first time — `make lint` existed since
+  Phase 9 but had never actually been run/verified). Purely cosmetic
+  (import ordering, `(new X())`→`(new X)`, collapsed empty constructor
+  bodies, `!$x`→`! $x`); zero behavior change, 55/55 tests still pass
+  (161 assertions, byte-for-byte unchanged). See `docs/TECHNICAL_DEBT.md`
+  P3-8.
+- **`fix(ci)`: provision `.env` before `docker compose config -q`.**
+  `docker-build-validate`'s compose-validation step ran on a bare
+  checkout with no `.env` (gitignored by design) and failed closed on
+  the `pgsql` service's required `POSTGRES_DB`/`USER`/`PASSWORD`
+  interpolation — exactly correct behavior for an actual deploy, wrong
+  for a config-lint step. Fixed by running the pre-existing `make env`
+  target (copies `.env.example` → `.env`, placeholders only, no
+  secrets) immediately before the validate step, mirroring what `make
+  up` already does for a human developer. Caught by watching the real
+  first CI run go red (PR #92, run `44281068441`), not by local
+  reasoning about the YAML — local `docker build`/`docker compose`
+  testing never exercised a checkout without a pre-existing `.env`.
+- Measured real CI run time and the slowest jobs: `docs/TEST_REPORT.md`.
+
 ### Security — Phase 9 hardening (2026-11-18)
 
 - **P0 fixed: real authentication + authorization on every

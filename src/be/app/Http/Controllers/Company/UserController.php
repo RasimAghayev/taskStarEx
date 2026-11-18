@@ -13,14 +13,12 @@ use App\Models\Company\User as CompanyUser;
 use App\Support\Csv\CsvSafety;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
-    public function __construct(private readonly UserRepositoryInterface $userRepository)
-    {
-    }
+    public function __construct(private readonly UserRepositoryInterface $userRepository) {}
 
     public function index(Request $request)
     {
@@ -97,7 +95,7 @@ class UserController extends Controller
             ], 422);
         }
 
-        $rules = (new StoreUserRequest())->rules();
+        $rules = (new StoreUserRequest)->rules();
         $created = 0;
         $errors = [];
         $seenFins = [];
@@ -113,7 +111,7 @@ class UserController extends Controller
             $row = $handle->current();
             $rowNumber++;
 
-            if (!is_array($row) || $row === [null]) {
+            if (! is_array($row) || $row === [null]) {
                 $handle->next();
 
                 continue; // trailing blank line (SplFileObject may yield `false` or `[null]` past the last real row)
