@@ -82,7 +82,15 @@ class UserAuditObserver
                 'fin' => $user->getKey(),
                 'action' => $action,
                 'changes' => $changes,
-                'performed_by' => null, // no authentication exists yet (Phase 9); Phase 9 backfills this going forward once it does
+                // Phase 9 backfill: real authentication now exists. The
+                // 'sanctum' guard is explicit (not the bare auth() default
+                // guard, which is still 'web') because every
+                // /api/company/users/* route authenticates via
+                // auth:sanctum. Stays null outside an authenticated HTTP
+                // request (factories/seeders/console) -- there is no real
+                // actor to record there, and that is not a regression,
+                // it's the honest value.
+                'performed_by' => auth('sanctum')->user()?->email,
             ]);
         } catch (\Throwable $ex) {
             Log::error('Failed to write company user audit log', [
