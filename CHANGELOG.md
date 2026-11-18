@@ -56,6 +56,18 @@ for its own releases where applicable.
   bodies, `!$x`→`! $x`); zero behavior change, 55/55 tests still pass
   (161 assertions, byte-for-byte unchanged). See `docs/TECHNICAL_DEBT.md`
   P3-8.
+- **`fix(ci)`: provision `.env` before `docker compose config -q`.**
+  `docker-build-validate`'s compose-validation step ran on a bare
+  checkout with no `.env` (gitignored by design) and failed closed on
+  the `pgsql` service's required `POSTGRES_DB`/`USER`/`PASSWORD`
+  interpolation — exactly correct behavior for an actual deploy, wrong
+  for a config-lint step. Fixed by running the pre-existing `make env`
+  target (copies `.env.example` → `.env`, placeholders only, no
+  secrets) immediately before the validate step, mirroring what `make
+  up` already does for a human developer. Caught by watching the real
+  first CI run go red (PR #92, run `44281068441`), not by local
+  reasoning about the YAML — local `docker build`/`docker compose`
+  testing never exercised a checkout without a pre-existing `.env`.
 - Measured real CI run time and the slowest jobs: `docs/TEST_REPORT.md`.
 
 ### Security — Phase 9 hardening (2026-11-18)
