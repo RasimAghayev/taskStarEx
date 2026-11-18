@@ -1,115 +1,109 @@
-#version: "3.9"
-
 name: "teststarex"
+
 networks:
   teststarex:
     name: teststarex
 
+volumes:
+  pgsql_data:
+  be_storage:
+
 services:
+  # --- core services (standalone, image-baked code, no manual steps) -------
   nginx:
     build:
       context: .
       dockerfile: nginx.dockerfile
-    container_name: nginx
     depends_on:
-      - php
-      - pgsql
+      php:
+        condition: service_healthy
     ports:
-      - "80:80"
-    volumes:
-      - ./src/be:/var/www/html/be:delegated
+      - "${APP_PORT:-20250}:80"
     networks:
       - teststarex
+    restart: unless-stopped
 
   php:
     build:
       context: .
       dockerfile: php.dockerfile
-    container_name: php
+      target: runtime
+    env_file:
+      - ./src/be/.env
+    depends_on:
+      pgsql:
+        condition: service_healthy
     volumes:
-      - ./src/be:/var/www/html/be:delegated
+      - be_storage:/var/www/html/be/storage
     networks:
       - teststarex
-
-  composer:
-    image: composer:latest
-    container_name: composer
-    volumes:
-      - ./src/be:/var/www/html/be
-    working_dir: /var/www/html/be
-    networks:
-      - teststarex
-
-  artisan:
-    build:
-      context: .
-      dockerfile: php.dockerfile
-    container_name: artisan
-    volumes:
-      - ./src/be:/var/www/html/be
-    working_dir: /var/www/html/be
-    entrypoint: ["php", "artisan"]
-    networks:
-      - teststarex
-
-  phpunit:
-    build:
-      context: .
-      dockerfile: php.dockerfile
-    container_name: phpunit
-    volumes:
-      - ./src/be:/var/www/html/be
-    working_dir: /var/www/html/be
-    entrypoint: ["/var/www/html/be/vendor/bin/phpunit"]
-    networks:
-      - teststarex
+    restart: unless-stopped
 
   pgsql:
-    image: postgres:latest
-    container_name: pgsql
-    restart: always
+    image: postgres:18.7@sha256:2ea8630df176ad090ec92136dee850397c5af8781e4bcf2e4162593691c61bbc
+    restart: unless-stopped
     shm_size: 128mb
     ports:
-      - "6432:5432"
+      - "${POSTGRES_PORT:-20252}:5432"
     volumes:
-      - ./db/postgres:/var/lib/postgresql/data
+      # Postgres 18+ images store data in a version-specific subdirectory and
+      # expect a single mount at /var/lib/postgresql (NOT .../data as in older
+      # postgres images / this repo's pre-Phase-5 compose file) — verified
+      # empirically in this phase, see docs/BASELINE.md.
+      - pgsql_data:/var/lib/postgresql
     networks:
       - teststarex
     environment:
-      - POSTGRES_DB=laraveldb
-      - POSTGRES_USER=laravel
-      - POSTGRES_PASSWORD=secret
+      POSTGRES_DB: ${POSTGRES_DB:?Set POSTGRES_DB in .env (see .env.example)}
+      POSTGRES_USER: ${POSTGRES_USER:?Set POSTGRES_USER in .env (see .env.example)}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-laravel} -d ${POSTGRES_DB:-laraveldb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   fe:
     build:
       context: .
       dockerfile: node.dockerfile
-    container_name: fe
+      target: runtime
     ports:
-      - "3000:3000"
+      - "${FE_PORT:-20251}:3000"
     environment:
-      - NUXT_PUBLIC_API_URL=http://localhost/api
+      NUXT_PUBLIC_API_URL: ${NUXT_PUBLIC_API_URL:-http://localhost:20250/api}
+    networks:
+      - teststarex
+    restart: unless-stopped
+
+  # --- dev-only tool runners (not started by `docker compose up`) ----------
+  # Usage: docker compose --profile tools run --rm php-dev php artisan migrate
+  #        docker compose --profile tools run --rm php-dev composer require ...
+  #        docker compose --profile tools run --rm php-dev ./vendor/bin/pint
+  php-dev:
+    build:
+      context: .
+      dockerfile: php.dockerfile
+      target: build
+    profiles: ["tools"]
+    env_file:
+      - ./src/be/.env
+    depends_on:
+      pgsql:
+        condition: service_healthy
+    volumes:
+      - be_storage:/var/www/html/be/storage
     networks:
       - teststarex
 
-  npm:
-    image: node:current-alpine
-    container_name: npm
-    ports:
-      - "5173:3000"
-    volumes:
-      - ./src/fe:/var/www/html/fe
-    working_dir: /var/www/html/fe
-    entrypoint: ["npm"]
-    networks:
-      - teststarex
-
-  npx:
-    image: node:current-alpine
-    container_name: npx
-    volumes:
-      - ./src/fe:/var/www/html/fe
-    working_dir: /var/www/html/fe
-    entrypoint: ["npx"]
+  # Usage: docker compose --profile tools run --rm fe-dev npm run dev
+  #        docker compose --profile tools run --rm fe-dev npx nuxi@latest ...
+  fe-dev:
+    build:
+      context: .
+      dockerfile: node.dockerfile
+      target: build
+    profiles: ["tools"]
     networks:
       - teststarex
