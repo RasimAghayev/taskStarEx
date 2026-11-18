@@ -56,11 +56,12 @@ Everything else (frontend tests, dead-code removal, docs, CI expansion) can proc
 ## Phase 7 — Dead code removal
 
 - Remove (separate commits, tooling+coverage evidence per the skill's "never delete on a guess" rule, after Phase 6 lands so nothing is removed prematurely):
-  - `apache.dockerfile` + `server/apache/httpd-vhosts.conf`.
-  - `vuex` dependency (re-confirm zero usage survived the Nuxt 4 bump before deleting).
-  - `src/fe/components/DatePicker.vue`.
-- Decide and document (ADR, paired with Phase 8) the fate of the default Laravel auth scaffold (`users`/`password_reset_tokens`/`sessions` migrations, default `User` model+factory, `DatabaseSeeder`'s seed, the dead `/user` route). Recommendation to evaluate: keep the already-shipped migrations as-is (don't rewrite released migration history casually), delete only the dead `/user` route, write the decision down either way.
-- Acceptance: each deletion has a tooling/coverage citation in its commit; no behavior regression per Phase 11's regression baseline.
+  - `apache.dockerfile` + `server/apache/httpd-vhosts.conf`. **Done** — commit `c8b336b`. Re-confirmed unreferenced (grep across CI, Makefile, `docker-compose.yml`, `Command.txt`, README) before deletion.
+  - `vuex` dependency (re-confirm zero usage survived the Nuxt 4 bump before deleting). **Done** — commit `ae86e26`. Re-confirmed via grep + `depcheck` + `knip` (all three agree). `vue-router`/`pinia`, also flagged "unused" by the same tools, were deliberately **not** removed — `vue-router` is a tooling false positive (Nuxt's file-based routing depends on it internally; `app.vue`'s `<router-view/>` confirms real usage) and `pinia`'s fate is Phase 8 scope, not Phase 7's. Dead-dependency removal only, not a Vuex→Pinia migration (no store ever existed to migrate).
+  - `src/fe/components/DatePicker.vue`. **Done** — commit `b97d891`. Re-confirmed via grep + `knip`.
+  - Structural realignment (Laravel 13 app structure, Nuxt 4 `app/` directory convention): considered, **no action** — Laravel 13 keeps Laravel 11's already-adopted skeleton (this repo already uses it); Nuxt 4's `app/` directory is optional/backward-compatible for upgraded-in-place projects and the current flat layout is already proven building/serving correctly in Docker. No real, present mismatch to fix (KISS/YAGNI, standing decision 7).
+- Decide and document (ADR, paired with Phase 8) the fate of the default Laravel auth scaffold (`users`/`password_reset_tokens`/`sessions` migrations, default `User` model+factory, `DatabaseSeeder`'s seed, the dead `/user` route). Recommendation to evaluate: keep the already-shipped migrations as-is (don't rewrite released migration history casually), delete only the dead `/user` route, write the decision down either way. **Explicitly left for Phase 8** — not decided or acted on in this phase.
+- Acceptance: each deletion has a tooling/coverage citation in its commit; no behavior regression per Phase 11's regression baseline. **Met** — `make verify` green (exit 0) after all three deletions; 8 backend tests/31 assertions unchanged (docs/BASELINE.md contract held exactly); `npm audit` high-severity count unchanged at 41, 0 new/worse findings.
 
 ## Phase 8 — Architecture
 
