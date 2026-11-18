@@ -18,6 +18,19 @@ for its own releases where applicable.
   an "Export CSV" button on `company/users/index.vue`'s toolbar. See
   `projects/info/state/handoff/8B/taskStarEx.md` for the full acceptance
   criteria and verification evidence.
+- **CSV bulk import of company users.** `POST /api/company/users/import`
+  (multipart `file`) accepts a CSV with the exact header
+  `fin,name,surname,father,dob,email,status` and validates every row with
+  the same rules `StoreUserRequest` already enforces for a single create
+  — no duplicated validation logic. A structurally wrong header is
+  rejected up front (422) before any row is touched; once the header is
+  accepted, a bad row (failed validation, in-file duplicate `fin`/email,
+  or duplicate against an existing row) is reported per row with its row
+  number and message and does not abort the batch — the response is
+  `{created, failed, errors[]}`. Frontend: an "Import CSV" button on
+  `company/users/index.vue`'s toolbar with an inline results panel. See
+  `projects/info/state/handoff/8B/taskStarEx.md` for the full acceptance
+  criteria and verification evidence.
 
 ### Changed — Phase 8 architecture (2026-11-18)
 

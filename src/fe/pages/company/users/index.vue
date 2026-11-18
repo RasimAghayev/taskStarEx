@@ -5,6 +5,23 @@
       <span>Company User List</span>
       <v-spacer></v-spacer>
       <v-btn
+        prepend-icon="mdi-upload"
+        variant="outlined"
+        color="secondary"
+        class="mr-2"
+        :loading="importing"
+        @click="$refs.importFileInput.click()"
+      >
+        Import CSV
+      </v-btn>
+      <input
+        ref="importFileInput"
+        type="file"
+        accept=".csv,text/csv"
+        class="d-none"
+        @change="importUsers"
+      />
+      <v-btn
         prepend-icon="mdi-download"
         variant="outlined"
         color="secondary"
@@ -35,6 +52,15 @@
 
     <v-alert v-if="error" type="error" variant="tonal" class="mx-4 mb-2">{{ error }}</v-alert>
 
+    <v-alert v-if="importResult" type="info" variant="tonal" closable class="mx-4 mb-2" @click:close="importResult = null">
+      Import finished: {{ importResult.created }} created, {{ importResult.failed }} failed.
+      <v-list v-if="importResult.errors?.length" density="compact" class="bg-transparent">
+        <v-list-item v-for="(err, idx) in importResult.errors" :key="idx">
+          Row {{ err.row }} ({{ err.fin || 'unknown fin' }}): {{ err.messages.join(', ') }}
+        </v-list-item>
+      </v-list>
+    </v-alert>
+
     <v-data-table-server
       v-model:items-per-page="itemsPerPage"
       v-model:page="page"
@@ -57,7 +83,7 @@
 </template>
 
 <script>
-import { deleteCompanyUser, exportCompanyUsers, getCompanyUsers } from '~/services/companyUsersService'
+import { deleteCompanyUser, exportCompanyUsers, getCompanyUsers, importCompanyUsers } from '~/services/companyUsersService'
 
 export default {
   name: 'CompanyUsersList',
@@ -71,6 +97,8 @@ export default {
       itemsPerPage: 10,
       totalItems: 0,
       exporting: false,
+      importing: false,
+      importResult: null,
       headers: [
         { title: 'FIN', key: 'fin' },
         { title: 'Name', key: 'name' },
@@ -136,6 +164,24 @@ export default {
         this.error = e?.response?.data?.message || 'Failed to export users'
       } finally {
         this.exporting = false
+      }
+    },
+    async importUsers(event) {
+      const file = event.target.files?.[0]
+      if (!file) return
+
+      this.importing = true
+      this.error = ''
+      this.importResult = null
+      try {
+        const response = await importCompanyUsers(file)
+        this.importResult = response.data?.data || null
+        await this.loadItems()
+      } catch (e) {
+        this.error = e?.response?.data?.message || 'Failed to import users'
+      } finally {
+        this.importing = false
+        event.target.value = ''
       }
     },
   },
