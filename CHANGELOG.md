@@ -8,6 +8,17 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Added — Phase 8B feature enhancement (2026-11-18, Gate 12 approved)
+
+- **CSV export of the company user list.** `GET /api/company/users/export`
+  (accepts the same `search` query parameter as the existing `index()`
+  endpoint, no page cap) streams every matching row as
+  `fin,name,surname,father,dob,email,status,status_label` via Laravel's
+  built-in `response()->streamDownload()` — no new dependency. Frontend:
+  an "Export CSV" button on `company/users/index.vue`'s toolbar. See
+  `projects/info/state/handoff/8B/taskStarEx.md` for the full acceptance
+  criteria and verification evidence.
+
 ### Changed — Phase 8 architecture (2026-11-18)
 
 - `src/be/app/Policies/Company/UserPolicy.php`: fixed — every one of its 7

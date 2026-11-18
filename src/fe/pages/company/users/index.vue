@@ -4,6 +4,16 @@
       <v-icon icon="mdi-account-group"></v-icon>
       <span>Company User List</span>
       <v-spacer></v-spacer>
+      <v-btn
+        prepend-icon="mdi-download"
+        variant="outlined"
+        color="secondary"
+        class="mr-2"
+        :loading="exporting"
+        @click="exportUsers"
+      >
+        Export CSV
+      </v-btn>
       <v-btn prepend-icon="mdi-account-plus" variant="outlined" color="primary" to="/company/users/create">
         Add New User
       </v-btn>
@@ -47,7 +57,7 @@
 </template>
 
 <script>
-import { deleteCompanyUser, getCompanyUsers } from '~/services/companyUsersService'
+import { deleteCompanyUser, exportCompanyUsers, getCompanyUsers } from '~/services/companyUsersService'
 
 export default {
   name: 'CompanyUsersList',
@@ -60,6 +70,7 @@ export default {
       page: 1,
       itemsPerPage: 10,
       totalItems: 0,
+      exporting: false,
       headers: [
         { title: 'FIN', key: 'fin' },
         { title: 'Name', key: 'name' },
@@ -106,6 +117,25 @@ export default {
         await this.loadItems()
       } catch (e) {
         this.error = e?.response?.data?.message || 'Failed to delete user'
+      }
+    },
+    async exportUsers() {
+      this.exporting = true
+      this.error = ''
+      try {
+        const response = await exportCompanyUsers({ search: this.search || undefined })
+        const url = URL.createObjectURL(new Blob([response.data], { type: 'text/csv' }))
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `company-users-${Date.now()}.csv`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+      } catch (e) {
+        this.error = e?.response?.data?.message || 'Failed to export users'
+      } finally {
+        this.exporting = false
       }
     },
   },

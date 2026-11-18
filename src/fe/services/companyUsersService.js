@@ -17,3 +17,7 @@ export const updateCompanyUser = (fin, payload) => {
 export const deleteCompanyUser = (fin) => {
   return useNuxtApp().$axiosApiClient.delete(`/company/users/${fin}`)
 }
+
+export const exportCompanyUsers = (params = {}) => {
+  return useNuxtApp().$axiosApiClient.get('/company/users/export', { params, responseType: 'blob' })
+}
