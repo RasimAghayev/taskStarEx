@@ -1,7 +1,7 @@
 SHELL := /bin/sh
 COMPOSE := docker compose
 
-.PHONY: help env build test verify up down run logs shell shell-fe lint format migrate seed key security clean
+.PHONY: help env build test verify up down run logs shell shell-fe lint format lint-fe stan migrate seed key security clean
 
 help:
 	@echo "taskStarEx — available targets:"
@@ -17,6 +17,8 @@ help:
 	@echo "  make shell-fe  shell into a frontend dev container"
 	@echo "  make lint      backend: laravel/pint --test (check only, no changes)"
 	@echo "  make format    backend: laravel/pint (applies fixes)"
+	@echo "  make lint-fe   frontend: eslint (@nuxt/eslint flat config, check only)"
+	@echo "  make stan      backend: larastan/phpstan static analysis"
 	@echo "  make migrate   run database migrations against the pgsql service"
 	@echo "  make seed      run database seeders against the pgsql service"
 	@echo "  make key       print a fresh APP_KEY to paste into src/be/.env"
@@ -67,6 +69,12 @@ lint: env
 
 format: env
 	$(COMPOSE) --profile tools run --rm php-dev ./vendor/bin/pint
+
+lint-fe: env
+	$(COMPOSE) --profile tools run --rm fe-dev sh -c "npx nuxt prepare && npm run lint"
+
+stan: env
+	$(COMPOSE) --profile tools run --rm php-dev ./vendor/bin/phpstan analyse --memory-limit=512M
 
 migrate: env
 	$(COMPOSE) --profile tools run --rm php-dev php artisan migrate --force
