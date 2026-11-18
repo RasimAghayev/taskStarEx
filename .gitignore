@@ -6,6 +6,11 @@
 
 .vscode/*
 
+# Root docker-compose env (see .env.example)
+/.env
+/.env.*
+!/.env.example
+
 /src/be/vendor/
 /src/be/node_modules/
 /src/be/npm-debug.log
