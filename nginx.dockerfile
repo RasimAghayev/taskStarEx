@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.29
 #
 # nginx reverse-proxy/static-file front for the Laravel backend (src/be).
 # public/ is a plain source COPY from the build context (repo root) — it is
