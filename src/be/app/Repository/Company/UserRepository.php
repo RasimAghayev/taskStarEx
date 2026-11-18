@@ -4,6 +4,7 @@ namespace App\Repository\Company;
 
 use App\Interfaces\Company\UserRepositoryInterface;
 use App\Models\Company\User;
+use Illuminate\Support\LazyCollection;
 
 class UserRepository implements UserRepositoryInterface
 {
@@ -12,7 +13,7 @@ class UserRepository implements UserRepositoryInterface
         return $this->buildSearchQuery($search)->paginate((int) $perPage);
     }
 
-    public function all($search = null): \Illuminate\Support\LazyCollection
+    public function all($search = null): LazyCollection
     {
         return $this->buildSearchQuery($search)->cursor();
     }
@@ -26,7 +27,7 @@ class UserRepository implements UserRepositoryInterface
     {
         $query = User::query();
 
-        if (!empty($search)) {
+        if (! empty($search)) {
             $operator = User::query()->getModel()->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
             $term = "%{$search}%";
             $query->where(function ($q) use ($term, $operator) {

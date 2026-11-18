@@ -3,6 +3,7 @@
 namespace App\Models\Company;
 
 use App\Enums\UserStatus;
+use Database\Factories\Company\UserFactory;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -28,8 +29,11 @@ class User extends Model
     use HasFactory;
 
     public $incrementing = false;
+
     protected $table = 'company_users';
+
     protected $keyType = 'string';
+
     protected $primaryKey = 'fin';
 
     protected $casts = [
@@ -49,6 +53,6 @@ class User extends Model
 
     protected static function newFactory(): Factory
     {
-        return \Database\Factories\Company\UserFactory::new();
+        return UserFactory::new();
     }
 }
