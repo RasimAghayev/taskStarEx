@@ -12,6 +12,7 @@ class CompanyUserExportTest extends TestCase
 
     public function test_export_returns_csv_with_header_and_all_rows(): void
     {
+        $this->actingAsApiUser();
         User::factory()->create([
             'fin' => 'EX11111',
             'name' => 'Ali',
@@ -41,6 +42,7 @@ class CompanyUserExportTest extends TestCase
 
     public function test_export_respects_the_search_filter(): void
     {
+        $this->actingAsApiUser();
         User::factory()->create(['fin' => 'AA11111', 'name' => 'Ali', 'surname' => 'Aliyev', 'email' => 'ali@example.com']);
         User::factory()->create(['fin' => 'BB22222', 'name' => 'Veli', 'surname' => 'Veliyev', 'email' => 'veli@example.com']);
 
@@ -54,6 +56,7 @@ class CompanyUserExportTest extends TestCase
 
     public function test_export_with_no_matches_returns_header_only_csv(): void
     {
+        $this->actingAsApiUser();
         User::factory()->create();
 
         $response = $this->get('/api/company/users/export?search=no-such-person-zzz');
