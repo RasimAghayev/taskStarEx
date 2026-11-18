@@ -9,9 +9,12 @@ use App\Http\Requests\Company\StoreUserRequest;
 use App\Http\Requests\Company\UpdateUserRequest;
 use App\Http\Resources\Company\UserResource;
 use App\Interfaces\Company\UserRepositoryInterface;
+use App\Models\Company\User as CompanyUser;
+use App\Support\Csv\CsvSafety;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class UserController extends Controller
 {
@@ -21,6 +24,8 @@ class UserController extends Controller
 
     public function index(Request $request)
     {
+        $this->authorize('viewAny', CompanyUser::class);
+
         $data = $this->userRepository->index(
             $request->query('search'),
             $request->integer('per_page', 15)
@@ -31,6 +36,8 @@ class UserController extends Controller
 
     public function export(Request $request)
     {
+        $this->authorize('viewAny', CompanyUser::class);
+
         $search = $request->query('search');
         $rows = $this->userRepository->all($search);
         $filename = 'company-users-'.now()->format('Ymd_His').'.csv';
@@ -40,15 +47,21 @@ class UserController extends Controller
             fputcsv($handle, ['fin', 'name', 'surname', 'father', 'dob', 'email', 'status', 'status_label']);
 
             foreach ($rows as $user) {
+                // CSV-injection defense (Phase 9): every string cell is
+                // sanitized regardless of field, since field-level input
+                // validation alone doesn't guarantee a leading
+                // formula-trigger character can never reach this point
+                // (e.g. email's local-part may legitimately start with
+                // '+'/'-').
                 fputcsv($handle, [
-                    $user->fin,
-                    $user->name,
-                    $user->surname,
-                    $user->father,
+                    CsvSafety::sanitizeForExport($user->fin),
+                    CsvSafety::sanitizeForExport($user->name),
+                    CsvSafety::sanitizeForExport($user->surname),
+                    CsvSafety::sanitizeForExport($user->father),
                     $user->dob?->format('Y-m-d'),
-                    $user->email,
+                    CsvSafety::sanitizeForExport($user->email),
                     $user->status?->value,
-                    $user->status?->description(),
+                    CsvSafety::sanitizeForExport($user->status?->description()),
                 ]);
             }
 
@@ -66,6 +79,8 @@ class UserController extends Controller
      */
     public function import(ImportUsersRequest $request)
     {
+        $this->authorize('create', CompanyUser::class);
+
         $expectedHeader = ['fin', 'name', 'surname', 'father', 'dob', 'email', 'status'];
 
         $handle = new \SplFileObject($request->file('file')->getRealPath());
@@ -116,6 +131,28 @@ class UserController extends Controller
             $data['fin'] = $fin;
             $email = $data['email'];
 
+            // CSV-injection defense (Phase 9): reject -- rather than
+            // silently rewrite -- a row whose raw value starts with a
+            // formula-trigger character. Unlike export's sanitize-in-place
+            // mitigation, mutating a user's actual data on the way in
+            // would be a correctness bug, not a safety fix.
+            $injectedField = null;
+            foreach ($data as $column => $value) {
+                if (is_string($value) && CsvSafety::isFormulaInjection($value)) {
+                    $injectedField = $column;
+                    break;
+                }
+            }
+
+            if ($injectedField !== null) {
+                $errors[] = ['row' => $rowNumber, 'fin' => $fin, 'messages' => [
+                    "Field '{$injectedField}' starts with a character ('=', '+', '-', '@') that could trigger spreadsheet formula execution; row rejected.",
+                ]];
+                $handle->next();
+
+                continue;
+            }
+
             if ($fin !== null && isset($seenFins[$fin])) {
                 $errors[] = ['row' => $rowNumber, 'fin' => $fin, 'messages' => ["Duplicate fin '{$fin}' already appears earlier in this file (row {$seenFins[$fin]})."]];
                 $handle->next();
@@ -151,6 +188,19 @@ class UserController extends Controller
             $handle->next();
         }
 
+        // Structured logging (Phase 9): a partial-failure CSV import is
+        // otherwise invisible server-side -- the only record of it was
+        // the JSON response to whichever client happened to make the
+        // request. Row-level messages are omitted here (they may contain
+        // user-submitted values); the per-row fin/row-number pairing is
+        // enough to correlate with the response the caller received.
+        Log::info('Company user CSV import completed', [
+            'user_id' => $request->user()?->getAuthIdentifier(),
+            'created' => $created,
+            'failed' => count($errors),
+            'failed_rows' => array_column($errors, 'row'),
+        ]);
+
         return response()->json([
             'success' => true,
             'data' => [
@@ -163,6 +213,8 @@ class UserController extends Controller
 
     public function store(StoreUserRequest $request)
     {
+        $this->authorize('create', CompanyUser::class);
+
         $details = $request->validated();
         DB::beginTransaction();
         try {
@@ -182,12 +234,16 @@ class UserController extends Controller
     public function show($fin)
     {
         $user = $this->userRepository->getByFin($fin);
+        $this->authorize('view', $user);
 
         return ApiResponseClass::sendResponse(new UserResource($user), '', 200);
     }
 
     public function update(UpdateUserRequest $request, $fin)
     {
+        $existing = $this->userRepository->getByFin($fin);
+        $this->authorize('update', $existing);
+
         $details = $request->validated();
         DB::beginTransaction();
         try {
@@ -206,6 +262,9 @@ class UserController extends Controller
 
     public function destroy($fin)
     {
+        $existing = $this->userRepository->getByFin($fin);
+        $this->authorize('delete', $existing);
+
         DB::beginTransaction();
         try {
             $this->userRepository->delete($fin);
