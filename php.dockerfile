@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.29
 #
 # taskStarEx backend (src/be, Laravel) — multi-stage build.
 # Stages: base -> deps -> build -> test -> runtime (runtime branches off base
