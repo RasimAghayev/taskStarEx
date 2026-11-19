@@ -8,6 +8,55 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Changed — resolve `test`↔`main` merge conflict ahead of first promotion (2026-11-19)
+
+- Merged `main` into `test` (via `chore/resolve-test-main-conflict`) to
+  converge the two branches' independent, parallel edits to
+  `php.dockerfile`, `src/be/composer.json`, and `src/be/composer.lock`
+  (plus a modify/delete conflict on `.github/workflows/laravel.yml`,
+  surfaced only once the merge actually ran) ahead of the repo's first
+  `test`→`main` promotion (PR #103).
+- `php` runtime floor `^8.4` → `^8.5` — a re-checked decision, not a
+  default to either branch's existing value. See `docs/TECHNICAL_DEBT.md`
+  P2-8's 2026-11-19 addendum for the full registry-check evidence
+  (PHP 8.5 confirmed as the current latest active-support branch;
+  `php:8.5.12-fpm` confirmed as the latest available Docker Hub tag and
+  already what this repo's own `php.dockerfile`/CI run on; every
+  `require`/`require-dev` package's latest version re-checked against
+  Packagist, none capping below 8.5). `laravel/framework` stays `^13.0`
+  (resolved `v13.43.0`) and `laravel/sanctum`/`larastan` stay declared —
+  `main`'s own `^12.0`, no-sanctum state (from its direct PR #97) is
+  superseded, per PR #103's own stated intent.
+- `src/be/composer.lock` regenerated from scratch (`composer update`
+  inside the project's own `php.dockerfile` `base` stage, i.e. the real
+  `php:8.5.12-fpm` image, not a throwaway substitute) against the merged
+  manifest. Every package resolved to its true current latest within its
+  declared range (`laravel/pint` 1.32.3, `laravel/sail` 1.71.0,
+  `nunomaduro/collision` 8.9.6, `phpunit/phpunit` 13.4.8,
+  `spatie/laravel-ignition` 2.13.0, `fakerphp/faker` 1.24.1) — confirming
+  the manifest's existing require-dev floor text didn't need bumping to
+  get latest-compatible resolutions.
+- `.github/workflows/laravel.yml` deleted (kept test's side of the
+  modify/delete conflict) — it was already superseded by
+  `.github/workflows/ci.yml` in Phase 10; `main`'s PR #97 had kept
+  patching the old file without that context.
+- `php.dockerfile`: kept `test`'s multi-stage
+  `base -> deps -> build -> test -> runtime` version wholesale — `main`'s
+  single-`FROM` conflicting line was already redundant with the `base`
+  stage's own `php:8.5.12-fpm` pin.
+
+### Security
+
+- `composer audit` on the regenerated lockfile: "No security vulnerability
+  advisories found" — `CVE-2026-114509` (Laravel TokenGuard auth bypass,
+  the original reason for this repo's lockfile-regeneration discipline,
+  `docs/TECHNICAL_DEBT.md` P0-2) stays out of range at `laravel/framework
+  v13.43.0`.
+- `docker build --target test -f php.dockerfile .`: exit 0, **66 passed
+  (185 assertions)** — unchanged from the pre-existing regression floor
+  (`docs/BASELINE.md` §8), confirming zero regression from the floor bump
+  or the lockfile regeneration.
+
 ### Added — Phase 15 docs, manifest, diagrams (2026-11-19)
 
 - Full community-standards file set, none of which previously existed in
