@@ -49,7 +49,7 @@ Fixed in this phase:
 ## 2. Hardcoded credential fix
 
 Before: `docker-compose.yml` lines 79-81 hardcoded
-`POSTGRES_PASSWORD=secret` (and similarly weak `POSTGRES_DB`/`POSTGRES_USER`
+`POSTGRES_PASSWORD=<REDACTED>` (and similarly weak `POSTGRES_DB`/`POSTGRES_USER`
 defaults) directly in the compose file.
 
 After: `docker-compose.yml`'s `pgsql` service now requires
