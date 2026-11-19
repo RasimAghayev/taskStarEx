@@ -10,7 +10,7 @@
 # Build context is the repository root (see docker-compose.yml: context: .).
 
 # ---- base: PHP runtime + required extensions + composer binary ------------
-FROM php:8.5.12-fpm@sha256:baf3ea13a8207fa18e1011bad1016e8b5e59fc974c6966d0efa6f36a16f875f0 AS base
+FROM php:8.6.0-fpm@sha256:afe649d1c5f3713a69f28b8f65022c854daa686db3265040c825ded095d89a4b AS base
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential \
