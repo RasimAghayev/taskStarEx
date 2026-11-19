@@ -142,4 +142,51 @@ class CompanyUserImportTest extends TestCase
         $response->assertStatus(422);
         $this->assertDatabaseCount('company_users', 0);
     }
+
+    /**
+     * Phase 9 hardening added ImportUsersRequest's `mimes:csv,txt` rule
+     * specifically so a non-CSV file can't reach the parser at all. Phase
+     * 11 (this phase) found this had zero test coverage.
+     *
+     * Verified empirically (not assumed) that Laravel's `mimes` rule
+     * checks the file's actual content-guessed extension
+     * (`UploadedFile::guessExtension()`, fileinfo-backed), not the
+     * client-supplied filename -- an initial version of this test used
+     * plain CSV text renamed to "report.pdf" and it was correctly
+     * *accepted* (content guesses as text/plain -> "txt", which is
+     * allowed), which is what sent this test back to real PDF magic
+     * bytes below rather than a renamed text file.
+     */
+    public function test_a_file_whose_content_is_not_csv_or_plain_text_is_rejected(): void
+    {
+        $this->actingAsApiUser();
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n", 'report.pdf'),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+        $this->assertDatabaseCount('company_users', 0);
+    }
+
+    /**
+     * Phase 9 hardening also added a `max:5120` (5 MB) cap specifically so
+     * this bulk-write endpoint can't be used to exhaust disk/memory with
+     * one oversized request. Also previously untested -- confirms the
+     * cap is real, not just documented in ImportUsersRequest's own
+     * comment.
+     */
+    public function test_a_file_larger_than_the_5mb_limit_is_rejected(): void
+    {
+        $this->actingAsApiUser();
+        $oversized = "fin,name,surname,father,dob,email,status\n".str_repeat('A', 5 * 1024 * 1024 + 1024);
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($oversized),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+        $this->assertDatabaseCount('company_users', 0);
+    }
 }
