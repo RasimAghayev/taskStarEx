@@ -1,13 +1,18 @@
 # syntax=docker/dockerfile:1.29
 #
 # taskStarEx frontend (src/fe, Nuxt) — multi-stage build.
-# Stages: base -> deps -> build -> test -> runtime. `test` is a build-output
-# characterization check (no frontend test runner exists yet — that is
-# Phase 11's job per the orchestrator directive; this stage only asserts the
-# production server bundle was actually produced). See docs/BASELINE.md for
+# Stages: base -> deps -> build -> test -> runtime. See docs/BASELINE.md for
 # the pre-existing manifest/lockfile drift (nuxt ^4.0.0 / vue-router ^5.0.0
-# declared but not locked) that currently blocks `deps` onward — Phase 6's
-# job, not fixed here.
+# declared but not locked) that originally blocked `deps` onward — resolved
+# by Phase 6.
+#
+# `test` (Phase 11): runs the real Vitest unit suite (`npm run test`, see
+# vitest.config.ts) added this phase — before this, zero frontend tests
+# existed anywhere in this repo. The pre-existing build-output
+# characterization check (confirming the production server bundle was
+# actually produced) is kept as a second, independent assertion — it
+# caught a real class of defect (a broken build) the unit suite alone
+# would not, since the unit suite never calls `nuxt build`.
 #
 # Build context is the repository root (see docker-compose.yml: context: .).
 
@@ -28,8 +33,9 @@ FROM deps AS build
 COPY src/fe/ ./
 RUN npm run build
 
-# ---- test: characterization check that the build actually produced a server
+# ---- test: real unit suite (Phase 11) + build-output characterization ----
 FROM build AS test
+RUN npm run test
 RUN test -f .output/server/index.mjs
 
 # ---- runtime: only the built output, no node_modules/dev tooling ----------
