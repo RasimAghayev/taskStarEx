@@ -1,0 +1,32 @@
+# Phase 15 (documenter) — machine-readable ecosystem manifest.
+# Consumed by tools/generate_graph.* to build projects/info/ECOSYSTEM.md and
+# this README's "Use together with" section, and to CI-check that this file
+# matches the repo's real dependencies.
+#
+# Every field below is derived from the real code/config, not invented:
+#   - provides.api  -> openapi.yaml exists at repo root and is kept current
+#     with routes/api.php (see docs/ARCHITECTURE.md's API contract table).
+#   - depends_on    -> projects/info/DEPENDENCY_MAP.md (Phase 2, confirmed
+#     independently per-repo and again at the program level): taskStarEx
+#     makes zero outbound calls to any other RasimAghayev repo, imports no
+#     other RasimAghayev repo as a package/git/path dependency, and has no
+#     submodules. This is confirmed, not an absence of looking.
+#   - related       -> same source; no other RasimAghayev repo references
+#     taskStarEx either (DEPENDENCY_MAP.md's cross-repo-links pass covers
+#     all repos it has analyzed). Left empty rather than invented.
+
+name: taskStarEx
+type: service   # a two-tier (Laravel API + Nuxt SPA) CRUD service; see docs/ARCHITECTURE.md
+license: MIT   # matches LICENSE at repo root; decision record: docs/DEPENDENCY_DECISIONS.md
+
+provides:
+  - api: openapi.yaml   # taskStarEx API — auth (Sanctum), company-user CRUD, CSV export/import, audit log, health
+
+depends_on:
+  services: []    # confirmed empty — no other RasimAghayev service is called over the network
+  libraries: []    # confirmed empty — no other RasimAghayev repo is pinned as a library/package/git dependency
+
+runs_standalone: true   # docker-compose.yml brings up nginx+php+pgsql+fe with no external repo required
+
+related: []   # confirmed empty — see projects/info/DEPENDENCY_MAP.md; no other repo in this program
+              # references or is referenced by taskStarEx. Revisit if that ever changes.
