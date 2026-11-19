@@ -1,0 +1,6 @@
+# This is a single-owner personal-account repository — one maintainer,
+# reflected honestly rather than inventing a team. Required status checks
+# (.github/workflows/ci.yml) must still pass before any PR merges,
+# independent of this file.
+
+* @RasimAghayev
