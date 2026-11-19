@@ -10,11 +10,11 @@ for its own releases where applicable.
 
 ### Security — Gate 1 history rewrite: remove literal secret from git history (2026-11-19)
 
-- Removed the literal value `POSTGRES_PASSWORD=secret` (introduced at
+- Removed the literal value `POSTGRES_PASSWORD=<REDACTED>` (introduced at
   `f8805cb`, fixed forward in the live file at `5f8dba6`, but never
   removed from history) from the git history of `main`, `test`, and
   `preview` via `git filter-repo --replace-text`
-  (`POSTGRES_PASSWORD=secret==>POSTGRES_PASSWORD=***REMOVED***`),
+  (`POSTGRES_PASSWORD=<REDACTED>==>POSTGRES_PASSWORD=***REMOVED***`),
   approved by the repo owner as Gate 1 ("Tarixdən təmizlə —
   Gate 1 — force-push").
 - Verified before force-pushing: tip tree hashes byte-identical
