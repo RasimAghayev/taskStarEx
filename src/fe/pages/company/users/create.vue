@@ -1,9 +1,9 @@
 ﻿<template>
   <v-card flat class="pa-4">
     <v-card-title class="d-flex align-center pe-2">
-      <v-icon icon="mdi-account-plus"></v-icon>
+      <v-icon icon="mdi-account-plus" />
       <span class="ml-2">Add Company User</span>
-      <v-spacer></v-spacer>
+      <v-spacer />
       <v-btn prepend-icon="mdi-keyboard-backspace" variant="outlined" color="primary" to="/company/users">Back</v-btn>
     </v-card-title>
 
@@ -31,6 +31,7 @@
 
 <script>
 import { createCompanyUser } from '~/services/companyUsersService'
+import { USER_STATUS_OPTIONS } from '~/constants/userStatus'
 
 export default {
   name: 'AddCompanyUser',
@@ -48,16 +49,7 @@ export default {
         email: '',
         status: 'new_register',
       },
-      statusItems: [
-        { title: 'Yeni Qeydiyyat', value: 'new_register' },
-        { title: 'İşləyir', value: 'it_works' },
-        { title: 'Məzuniyyət', value: 'vacation' },
-        { title: 'Analıq məzuniyyəti', value: 'maternity_leave' },
-        { title: 'Təhsil', value: 'education' },
-        { title: 'Ezamiyyət', value: 'business_trip' },
-        { title: 'Çıxıb', value: 'out' },
-        { title: 'Çıxarılıb', value: 'removed' },
-      ],
+      statusItems: USER_STATUS_OPTIONS,
       req: (v) => !!v || 'Required',
     }
   },
