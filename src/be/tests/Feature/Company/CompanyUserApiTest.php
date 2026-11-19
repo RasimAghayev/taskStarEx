@@ -25,6 +25,7 @@ class CompanyUserApiTest extends TestCase
 
     public function test_can_list_company_users(): void
     {
+        $this->actingAsApiUser();
         User::factory()->count(2)->create();
 
         $response = $this->getJson('/api/company/users');
@@ -36,6 +37,8 @@ class CompanyUserApiTest extends TestCase
 
     public function test_can_create_company_user(): void
     {
+        $this->actingAsApiUser();
+
         $response = $this->postJson('/api/company/users', $this->payload());
 
         $response->assertCreated()
@@ -47,6 +50,8 @@ class CompanyUserApiTest extends TestCase
 
     public function test_validation_fails_for_invalid_payload(): void
     {
+        $this->actingAsApiUser();
+
         $response = $this->postJson('/api/company/users', $this->payload([
             'fin' => 'bad',
             'email' => 'not-an-email',
@@ -60,6 +65,7 @@ class CompanyUserApiTest extends TestCase
 
     public function test_can_show_company_user(): void
     {
+        $this->actingAsApiUser();
         $user = User::factory()->create(['fin' => 'ZX98765']);
 
         $response = $this->getJson('/api/company/users/ZX98765');
@@ -71,6 +77,7 @@ class CompanyUserApiTest extends TestCase
 
     public function test_can_update_company_user(): void
     {
+        $this->actingAsApiUser();
         $user = User::factory()->create(['fin' => 'UP12345', 'email' => 'old@example.com']);
 
         $response = $this->putJson('/api/company/users/UP12345', $this->payload([
@@ -88,6 +95,7 @@ class CompanyUserApiTest extends TestCase
 
     public function test_can_search_and_paginate_company_users(): void
     {
+        $this->actingAsApiUser();
         User::factory()->create(['fin' => 'AA11111', 'name' => 'Ali', 'surname' => 'Aliyev', 'email' => 'ali@example.com']);
         User::factory()->create(['fin' => 'BB22222', 'name' => 'Veli', 'surname' => 'Veliyev', 'email' => 'veli@example.com']);
 
@@ -101,6 +109,7 @@ class CompanyUserApiTest extends TestCase
 
     public function test_can_delete_company_user(): void
     {
+        $this->actingAsApiUser();
         User::factory()->create(['fin' => 'DL12345']);
 
         $response = $this->deleteJson('/api/company/users/DL12345');

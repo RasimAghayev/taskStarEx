@@ -138,3 +138,52 @@ Plus the unused default-auth tables (`users`, `password_reset_tokens`, `sessions
 - SQL injection: not a concern — the one dynamic query (`UserRepository::index()`'s search) uses Eloquent's parameterized query builder throughout.
 - Secrets: redacted working-tree scan (`gitleaks dir . --redact`, this phase) found none. One hardcoded dev-only Postgres placeholder credential noted above (location only).
 - Dependency vulnerabilities: see `docs/TECHNICAL_DEBT.md` and `projects/info/deps/taskStarEx.md` for the full, already-quantified list (1 critical CVE on the backend, 70 vulnerable npm packages / 5 critical on the frontend).
+
+## Phase 8 — Architecture decisions (2026-11-18)
+
+> Appended by Phase 8 without altering the Phase 3 snapshot above. Per
+> `PROMPT.md` Phase 8's apply/don't-apply table: every applied pattern gets
+> a "why here" below plus an ADR in `docs/adr/`; every skipped principle
+> gets a one-line reason.
+
+### Applied
+
+- **DRY — status-option list.** `create.vue` and `[fin].vue` each
+  hand-duplicated the identical 8-entry status dropdown (value +
+  Azerbaijani label). Real, present duplication (not coincidental
+  similarity) at exactly 2 call sites — extracted to one new module,
+  `src/fe/constants/userStatus.js` (`USER_STATUS_OPTIONS`), both pages now
+  import it. See **ADR-0002**.
+- **KISS/YAGNI — removed `pinia`.** Added in Phase 6 only to satisfy
+  `vue-router@5`'s *optional* peer dependency; re-confirmed this phase
+  (independent grep + reading `vue-router`'s own
+  `peerDependenciesMeta.pinia.optional === true`) that it is genuinely
+  unused and not actually required to install `vue-router@5`. No present
+  feature needs client-side shared state. Removed rather than kept "for
+  later." See **ADR-0003**.
+- **KISS/YAGNI — `UserPolicy` fixed, not expanded.** The fix is the
+  minimum needed for internal correctness (explicit `return false;` per
+  method, replacing a missing-return bug) — no new methods, no invented
+  role/permission model, no wiring into routes/controllers (that remains
+  Phase 9's job). See **ADR-0001**.
+
+### Explicitly not applied (one-line reason each)
+
+| Principle | Reason not applied here |
+|---|---|
+| SOLID | The existing Repository-pattern slice (`UserController` → `UserRepositoryInterface` → `UserRepository`) already has one reason to change per class, no concrete coupling blocks testing today, and nothing in this phase's 3 items introduces a new class with mixed responsibilities — no SOLID violation found to fix. |
+| Clean/Hexagonal | No external system (DB/queue/other service) needs to become swappable — the one external dependency (PostgreSQL via Eloquent) has no second implementation to support and no present requirement for one; introducing ports/adapters here would be ceremony with nothing to decouple. |
+| DDD (bounded context/aggregate/value object) | Single flat `company_users` table, no relations, no invariants beyond field-level validation already enforced in `StoreUserRequest`/`UpdateUserRequest` — plain CRUD, not real domain complexity. |
+| EDA (domain events/outbox) | No async reaction or cross-module/cross-service integration exists or is planned; every operation here is a direct synchronous CRUD call — a direct call is simpler and nothing is lost by not eventing it. |
+| Modular monolith | One backend (`src/be`) with one business module (`company_users`) and one frontend (`src/fe`) talking over HTTP — there are no competing internal module boundaries inside either app root to formalize. |
+| GoF patterns | No new named, present problem surfaced by this phase's 3 items that a GoF pattern would solve better than the straightforward fix each already received (deny-by-default return statements, a plain exported constant, a dependency removal). |
+
+### Repository pattern — reaffirmed as-is
+
+The existing Repository-pattern slice (`UserController` → DI-bound
+`UserRepositoryInterface` → `UserRepository` → Eloquent) was evaluated
+again this phase and left completely unchanged: it is already a
+proportionate, readable application of the pattern for a single-entity
+CRUD slice, correctly registered in `RepositoryServiceProvider`. No
+restructuring was needed or performed.
+

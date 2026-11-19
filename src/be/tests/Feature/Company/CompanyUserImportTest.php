@@ -1,0 +1,192 @@
+<?php
+
+namespace Tests\Feature\Company;
+
+use App\Models\Company\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Tests\TestCase;
+
+class CompanyUserImportTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private function csvFile(string $contents, string $name = 'import.csv'): UploadedFile
+    {
+        $path = tempnam(sys_get_temp_dir(), 'csvimport');
+        file_put_contents($path, $contents);
+
+        return new UploadedFile($path, $name, 'text/csv', null, true);
+    }
+
+    public function test_all_valid_rows_are_imported(): void
+    {
+        $this->actingAsApiUser();
+        $csv = "fin,name,surname,father,dob,email,status\n".
+            "IM11111,Ali,Aliyev,Vali,1990-01-01,ali.import@example.com,new_register\n".
+            "IM22222,Veli,Veliyev,Hasan,1991-02-02,veli.import@example.com,it_works\n".
+            "IM33333,Sabir,Sabirov,Qabil,1992-03-03,sabir.import@example.com,vacation\n";
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.created', 3)
+            ->assertJsonPath('data.failed', 0);
+
+        $this->assertDatabaseHas('company_users', ['fin' => 'IM11111', 'email' => 'ali.import@example.com']);
+        $this->assertDatabaseHas('company_users', ['fin' => 'IM22222', 'email' => 'veli.import@example.com']);
+        $this->assertDatabaseHas('company_users', ['fin' => 'IM33333', 'email' => 'sabir.import@example.com']);
+    }
+
+    public function test_mixed_file_reports_per_row_success_and_failure(): void
+    {
+        $this->actingAsApiUser();
+        User::factory()->create(['fin' => 'EXIST11', 'email' => 'existing@example.com']);
+
+        $csv = "fin,name,surname,father,dob,email,status\n".
+            "MX11111,Ali,Aliyev,Vali,1990-01-01,mx1@example.com,new_register\n".     // valid
+            "MX22222,Veli,Veliyev,Hasan,1991-02-02,mx2@example.com,not_a_status\n".  // invalid status
+            "EXIST11,Dup,User,Dad,1990-01-01,dup@example.com,it_works\n".            // duplicate fin vs DB
+            "MX44444,Sabir,Sabirov,Qabil,1992-03-03,mx4@example.com,vacation\n";      // valid
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('success', true)
+            ->assertJsonPath('data.created', 2)
+            ->assertJsonPath('data.failed', 2);
+
+        $this->assertDatabaseHas('company_users', ['fin' => 'MX11111']);
+        $this->assertDatabaseHas('company_users', ['fin' => 'MX44444']);
+        $this->assertDatabaseMissing('company_users', ['fin' => 'MX22222']);
+        $this->assertDatabaseMissing('company_users', ['email' => 'dup@example.com']);
+
+        $errors = $response->json('data.errors');
+        $this->assertSame([3, 4], array_column($errors, 'row'));
+    }
+
+    public function test_in_file_duplicate_fin_is_reported_without_a_server_error(): void
+    {
+        $this->actingAsApiUser();
+        $csv = "fin,name,surname,father,dob,email,status\n".
+            "DF11111,Ali,Aliyev,Vali,1990-01-01,df1@example.com,new_register\n".
+            "DF11111,Second,Copy,Dad,1991-02-02,df2@example.com,it_works\n";
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.created', 1)
+            ->assertJsonPath('data.failed', 1);
+
+        $this->assertDatabaseHas('company_users', ['fin' => 'DF11111', 'email' => 'df1@example.com']);
+
+        $errors = $response->json('data.errors');
+        $this->assertStringContainsString('Duplicate fin', $errors[0]['messages'][0]);
+    }
+
+    public function test_a_row_with_a_formula_injection_prefix_is_rejected_not_imported(): void
+    {
+        $this->actingAsApiUser();
+
+        // '+' is a legal RFC 5321 email local-part character, so this row
+        // would otherwise pass StoreUserRequest's `email` validation --
+        // the CsvSafety check must catch it before that point, as a
+        // spreadsheet app would read a leading '+'/'='/'-'/'@' as the
+        // start of a formula.
+        $csv = "fin,name,surname,father,dob,email,status\n".
+            "CI11111,Ali,Aliyev,Vali,1990-01-01,+1234567@example.com,new_register\n";
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertOk()
+            ->assertJsonPath('data.created', 0)
+            ->assertJsonPath('data.failed', 1);
+
+        $this->assertDatabaseMissing('company_users', ['fin' => 'CI11111']);
+
+        $errors = $response->json('data.errors');
+        $this->assertStringContainsString("Field 'email' starts with", $errors[0]['messages'][0]);
+    }
+
+    public function test_malformed_header_is_rejected_before_any_row_is_processed(): void
+    {
+        $this->actingAsApiUser();
+        $csv = "id,first_name,last_name\n1,Ali,Aliyev\n";
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($csv),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('success', false);
+
+        $this->assertDatabaseCount('company_users', 0);
+    }
+
+    public function test_empty_file_is_rejected(): void
+    {
+        $this->actingAsApiUser();
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile(''),
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseCount('company_users', 0);
+    }
+
+    /**
+     * Phase 9 hardening added ImportUsersRequest's `mimes:csv,txt` rule
+     * specifically so a non-CSV file can't reach the parser at all. Phase
+     * 11 (this phase) found this had zero test coverage.
+     *
+     * Verified empirically (not assumed) that Laravel's `mimes` rule
+     * checks the file's actual content-guessed extension
+     * (`UploadedFile::guessExtension()`, fileinfo-backed), not the
+     * client-supplied filename -- an initial version of this test used
+     * plain CSV text renamed to "report.pdf" and it was correctly
+     * *accepted* (content guesses as text/plain -> "txt", which is
+     * allowed), which is what sent this test back to real PDF magic
+     * bytes below rather than a renamed text file.
+     */
+    public function test_a_file_whose_content_is_not_csv_or_plain_text_is_rejected(): void
+    {
+        $this->actingAsApiUser();
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n1 0 obj\n<< /Type /Catalog >>\nendobj\n", 'report.pdf'),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+        $this->assertDatabaseCount('company_users', 0);
+    }
+
+    /**
+     * Phase 9 hardening also added a `max:5120` (5 MB) cap specifically so
+     * this bulk-write endpoint can't be used to exhaust disk/memory with
+     * one oversized request. Also previously untested -- confirms the
+     * cap is real, not just documented in ImportUsersRequest's own
+     * comment.
+     */
+    public function test_a_file_larger_than_the_5mb_limit_is_rejected(): void
+    {
+        $this->actingAsApiUser();
+        $oversized = "fin,name,surname,father,dob,email,status\n".str_repeat('A', 5 * 1024 * 1024 + 1024);
+
+        $response = $this->post('/api/company/users/import', [
+            'file' => $this->csvFile($oversized),
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonValidationErrors(['file']);
+        $this->assertDatabaseCount('company_users', 0);
+    }
+}
