@@ -1,4 +1,14 @@
-# CI Pipeline Test Report
+# Test Report
+
+This file holds two independent reports, written by two different
+phases, kept in one file because they're both "how long/how well does
+the test machinery run" records for the same repo:
+
+1. **CI pipeline timing** (Phase 10) — below.
+2. **Test suite results and coverage** (Phase 11) — see that section
+   further down.
+
+## CI Pipeline Test Report
 
 Measured against a real GitHub Actions run, not estimated from the YAML.
 Written once, in Phase 10 (CI/CD), and updated only if the pipeline shape
@@ -105,3 +115,108 @@ side's quality/test/audit jobs are skipped entirely, though
 `docker-build-validate` still builds whichever runtime image(s) the
 changed side owns, plus `nginx` unconditionally since both sides depend on
 it).
+
+## Test Suite Results and Coverage Report
+
+Written in Phase 11 (tester). All numbers below are from real Docker
+builds run on this phase's work, not estimated — command and exit code
+given for each. See `docs/TESTING_STRATEGY.md` for what is and isn't
+tested and why, and `docs/BASELINE.md` for the full historical backend
+test-count progression (the regression contract).
+
+### Backend (`src/be`, PHPUnit 13)
+
+**Command**: `docker build --target test -f php.dockerfile -t taskstarex-be-test:p11-fixed .`
+**Result**: exit 0
+
+```
+Tests:    66 passed (185 assertions)
+```
+
+| | Before Phase 11 | After Phase 11 | Delta |
+|---|---:|---:|---:|
+| Tests | 55 | 66 | +11 |
+| Assertions | 161 | 185 | +24 |
+
+The 11 new tests (see `docs/BASELINE.md`'s Phase 11 addendum for the
+full list) close the gaps identified in this phase's brief:
+`UserPolicyTest` (7 tests locking in the real ADR-0004 authorization
+model — see the "correction" section of `docs/TESTING_STRATEGY.md`),
+2 new `CompanyUserExportTest` cases (CSV-injection-safe export of data
+that reached the database by a route other than the validated HTTP
+request), and 2 new `CompanyUserImportTest` cases (content-sniffed MIME
+rejection, oversized-file rejection).
+
+**Coverage**: not measured. Neither `pcov` nor `xdebug` is installed in
+`php.dockerfile`'s `base` stage (confirmed:
+`docker run --rm taskstarex-be-test:p11-fixed php -m | grep -iE
+"xdebug|pcov"` → no match, exit 1), so `php artisan test --coverage` has
+no driver to run against. Adding one is a `base`-stage change —
+every stage including `runtime` builds on `base` — which is a larger,
+riskier change than this phase's narrow "tests only" remit, and a new
+system dependency besides (standing decision 3: needs a
+`docs/DEPENDENCY_DECISIONS.md` entry, which in turn wants a real "do we
+actually want this permanently" decision, not one made in passing to
+produce a number for this report). Flagged as a known limitation and a
+candidate follow-up (either a future phase, or a dedicated, approved
+addition here) rather than silently skipped or faked.
+
+### Frontend (`src/fe`, Vitest 5 + happy-dom)
+
+**Command**: `docker build --target test -f node.dockerfile -t taskstarex-fe-test:p11 .`
+**Result**: exit 0
+
+```
+Test Files  3 passed (3)
+     Tests  19 passed (19)
+  Duration  1.20s
+```
+
+This is the first test suite that has ever existed for `src/fe` — there
+is no "before" column. All 3 files/19 tests cover the plain-JS service
+and constant modules (`authService.js`, `companyUsersService.js`,
+`constants/userStatus.js`); see `docs/TESTING_STRATEGY.md` for why
+component/page tests were ruled out of scope this phase.
+
+**Coverage** (`docker run --rm taskstarex-fe-test:p11 npm run test:coverage`,
+exit 0, v8 provider):
+
+| File | % Stmts | % Branch | % Funcs | % Lines | Uncovered |
+|---|---:|---:|---:|---:|---|
+| All files | 97.14 | 81.81 | 100 | 97.14 | |
+| `constants/userStatus.js` | 100 | 100 | 100 | 100 | — |
+| `services/authService.js` | 93.75 | 75 | 100 | 93.75 | line 29 |
+| `services/companyUsersService.js` | 100 | 100 | 100 | 100 | — |
+
+The one uncovered line is `authService.js:29` — the `return false` branch
+of `isAuthenticated()` taken when `!import.meta.client` (the SSR path).
+`vitest.config.ts` statically defines `import.meta.client` to `'true'`
+for the whole suite (replicating what Nuxt's own Vite plugin does at
+build time, per that file's comment), so the SSR branch of this one
+function is never exercised by this suite. Documented here rather than
+hidden; a true SSR-path test would need a second Vitest project/config
+with the macro flipped, which was judged disproportionate for one
+single-line branch (KISS/YAGNI) — revisit if `isAuthenticated()` grows
+real SSR-specific logic.
+
+### Build-output characterization (both languages)
+
+Both Dockerfiles' `test` stages also assert the production build
+actually produced a runnable artifact
+(`test -f .output/server/index.mjs` for `src/fe`; the backend has no
+equivalent separate build-output artifact to check, since
+`php artisan test` running at all already proves the application
+bootstraps). This is a different defect class than the unit suites above
+— it would catch a broken build that no unit test exercises — and both
+passed as part of the same Docker builds reported above (exit 0).
+
+### Conclusion
+
+Both languages' Docker test-stage builds are green with real, executed
+tests (no test was weakened, skipped, or reported passing without
+having actually run). Backend regression floor moved from 55/161 to
+66/185 with zero existing tests altered. Frontend went from no test
+infrastructure at all to a 19-test suite at 97% statement coverage on
+the code that exists. Known, documented gaps: backend code-coverage
+percentage (no driver installed, flagged above, not fabricated) and the
+frontend SSR-only branch noted above.

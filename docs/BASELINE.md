@@ -260,3 +260,36 @@ service split (`profiles: ["tools"]`) recorded in `docker-compose.yml`.
 Once Phase 6 fixes `P0-1`, this file's "cannot currently complete" claims
 must be re-verified for real (not assumed) and this document updated with
 actual `deps`/`build`/`test`/`runtime` results and final image sizes.
+
+## 8. Phase 11 addendum — the "8 tests" figure above is stale; here is the real, current floor
+
+Section 3's "8 tests / 31 assertions" was captured from a **disposable
+scratch copy**, before Phase 6 had unblocked `P0-1` in the real worktree
+— this file said so explicitly at the time ("Nothing from these scratch
+runs was copied back into the repo"). Phases 6 through 10 each
+independently re-ran the real worktree's test suite and recorded a
+growing, Docker-verified count (Phase 6: 8/31 unchanged; Phase 7: 8/31
+unchanged; Phase 8: 8/31 unchanged; Phase 8B: 21/91; Phase 9: 55/161;
+Phase 10: 55/161 unchanged after a cosmetic pint-formatting pass) — but
+this file's own section 3/7 text was never updated to say so, which is
+itself a small honesty gap Phase 11 is closing here rather than
+perpetuating.
+
+**The real, current regression floor, re-verified by this phase directly
+against `origin/preview`'s tip before any Phase 11 change:**
+
+```
+docker build --target test -f php.dockerfile .   # exit 0
+Tests:    55 passed (161 assertions)
+```
+
+This is not a new number invented by Phase 11 — it is Phase 9/10's own
+already-reported figure, confirmed again here with a fresh build. Phase
+11 then added 11 backend tests (66 passed / 185 assertions, see
+`docs/TEST_REPORT.md`'s Phase 11 section for the full breakdown) and the
+first-ever frontend test suite. **From this point forward, the
+regression floor is 66 backend tests / 185 assertions, plus the
+frontend suite's pass count recorded in `docs/TEST_REPORT.md`** — not
+the "8 tests" figure in section 3, which is retained above only as a
+historical record of what Phase 5 itself was able to verify at the time,
+not as a current contract.

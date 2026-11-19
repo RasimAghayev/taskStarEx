@@ -194,3 +194,59 @@
   slot name), suppressed with a targeted, documented
   `eslint-disable-next-line` comment each, not a blanket rule disable.
   Re-run: 0 problems.
+
+## vitest + happy-dom + @vitest/coverage-v8 (`src/fe`, dev-only) — added Phase 11, 2026-11-19
+
+- **What they are**: `vitest` is a Vite-native unit test runner (same
+  underlying bundler/transform pipeline this project's own `nuxt
+  build`/`npm run dev` already use, not a second, independent toolchain);
+  `happy-dom` is a lightweight DOM implementation used as `vitest`'s test
+  environment (provides `localStorage`/`document`/etc. without a real
+  browser); `@vitest/coverage-v8` is `vitest`'s own first-party coverage
+  reporter (Node's built-in V8 coverage, no instrumentation step).
+- **Why needed now**: `docs/TECHNICAL_DEBT.md`/this program's Phase 3
+  audit flagged "zero frontend tests, zero frontend test runner" as a
+  standing gap (Phase 10 could only wire a *build-output*
+  characterization check into `node.dockerfile`'s `test` stage for
+  exactly this reason — no runner existed to call). Phase 11's explicit
+  mandate is to close this for real, not just reserve a CI slot.
+- **What they overlap with / replace**: nothing already present — no test
+  runner, DOM shim, or coverage tool of any kind existed in `src/fe`
+  before this phase.
+- **Why not `@nuxt/test-utils`**: considered and rejected for this
+  phase's actual scope. `@nuxt/test-utils` wraps `vitest` in a full
+  Nuxt/Nitro test context (mounting real pages/components with Nuxt's own
+  auto-import/SSR pipeline) — disproportionate for what this phase
+  actually needed: unit-level coverage of plain-JS service/constant
+  modules (`services/authService.js`, `services/companyUsersService.js`,
+  `constants/userStatus.js`), none of which are Vue components. Plain
+  `vitest` + `happy-dom`, with `vitest.config.ts`'s `define` replicating
+  just the one Nuxt build-time macro these modules actually use
+  (`import.meta.client`), is the proportionate tool (KISS/YAGNI). If a
+  later phase adds real component/page-level tests, `@nuxt/test-utils`
+  would be the right re-evaluation point, not assumed now.
+- **Why not jsdom**: `happy-dom` is lighter-weight and is Vitest's own
+  documented recommended default; this app's tests need only
+  `localStorage`, nothing jsdom-specific (no `canvas`, no complex layout
+  APIs).
+- **Maintenance status**: `vitest` — actively maintained
+  (`github.com/vitest-dev/vitest`), the de-facto standard Vite-ecosystem
+  test runner. `happy-dom` — actively maintained
+  (`github.com/capricorn86/happy-dom`). Latest stable versions read live
+  from the npm registry at run time, per standing decision 1:
+  `vitest@5.1.1`, `happy-dom@21.0.4`, `@vitest/coverage-v8@5.1.1`.
+- **License**: MIT (all three).
+- **Known vulnerabilities**: `npm audit` (run inside the real
+  `node:26.13.1-alpine` image `node.dockerfile` uses, against the
+  regenerated `src/fe` lock) — see this phase's handoff for the exact
+  before/after count; no new advisory *title* introduced by this addition
+  specifically (re-traced via the `via` chain the same way Phase 9's
+  ESLint addition was).
+- **Size**: dev-only, zero production/runtime footprint — not part of
+  `node.dockerfile`'s `runtime` stage, which copies only `.output/`.
+- **Standard library equivalent**: none — Node/the browser have no
+  built-in test runner or DOM shim.
+- **Verification**: `docker build --target test -f node.dockerfile .`
+  (which now runs `npm run test` before the pre-existing build-output
+  characterization check) — see `docs/TEST_REPORT.md`'s Phase 11 section
+  for the real pass/fail count and coverage numbers.

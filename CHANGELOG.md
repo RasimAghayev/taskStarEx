@@ -8,6 +8,36 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Tests — Phase 11 test suite (2026-11-19)
+
+- **Backend**: 11 new tests added (55/161 → 66/185 assertions, zero
+  regression). `UserPolicyTest` (unit) locks in the real
+  authorization model documented in ADR-0004 (five methods `true`,
+  `restore`/`forceDelete` fail-closed). `CompanyUserExportTest` gained
+  two integration tests proving the export endpoint's CSV-injection
+  defense actually fires for data that reached the database outside
+  normal HTTP validation, and for a legitimately-created email starting
+  with a trigger character. `CompanyUserImportTest` gained two tests for
+  the previously-uncovered upload-hardening rules (`mimes:csv,txt`,
+  `max:5120`).
+- **Frontend**: first real test suite in this repo's history. Added
+  `vitest`/`happy-dom`/`@vitest/coverage-v8` (dev-only;
+  `docs/DEPENDENCY_DECISIONS.md`), `src/fe/vitest.config.ts`, and
+  `src/fe/tests/unit/**` covering `services/authService.js`,
+  `services/companyUsersService.js`, and `constants/userStatus.js`
+  (including a value-for-value contract test against the backend's
+  `UserStatus` enum, per `docs/adr/0002-...md`'s documented no-runtime-link
+  risk). `node.dockerfile`'s `test` stage now runs `npm run test` before
+  its pre-existing build-output characterization check.
+- **Docs**: `docs/TESTING_STRATEGY.md` added; `docs/TEST_REPORT.md`
+  extended with a Phase 11 section (Phase 10's CI-timing report kept
+  as-is); `docs/BASELINE.md` addendum correcting its stale "8 tests"
+  figure to the real, current regression floor.
+- See `projects/info/state/handoff/11/taskStarEx.md` for full evidence,
+  coverage numbers, and an incident note about out-of-scope commits
+  found (and discarded, not built upon) on this phase's intended branch
+  name before this phase's real work started.
+
 ### CI/CD — Phase 10 pipeline (2026-11-18)
 
 - **`.github/workflows/ci.yml` added, replacing the backend-only
