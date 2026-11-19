@@ -25,7 +25,7 @@
 |---|---|
 | `src/be/.env.example` | Placeholders only — compliant. Default `DB_CONNECTION=sqlite` in the example doesn't match the real dev stack's Postgres service — a documentation mismatch, not a security issue. |
 | `src/fe` | No `.env.example` at all, despite reading `process.env.NUXT_PUBLIC_API_URL` at runtime (a public URL, not a secret) — documentation gap. |
-| `docker-compose.yml:79-81` | Hardcoded dev Postgres credentials (`POSTGRES_DB=laraveldb`, `POSTGRES_USER=laravel`, `POSTGRES_PASSWORD=***REMOVED***`) directly in the committed compose file. Placeholder-style value, local-only port `6432` — not a live leak, flagged by location per the letter of the secrets policy. |
+| `docker-compose.yml:79-81` | Hardcoded dev Postgres credentials (`POSTGRES_DB=laraveldb`, `POSTGRES_USER=laravel`, `POSTGRES_PASSWORD=<REDACTED>`) directly in the committed compose file. Placeholder-style value, local-only port `6432` — not a live leak, flagged by location per the letter of the secrets policy. |
 | `src/be/config/auth.php` | Only a `web`/session guard defined. No `api`/`sanctum` guard exists, despite `routes/api.php` referencing `auth:sanctum`. |
 | `src/be/config/` | No `cors.php` published — CORS behavior for the cross-origin fe/be dev topology relies on undocumented framework defaults. |
 | `src/be/bootstrap/app.php` | `withExceptions()` closure is empty — no custom JSON-shaped error mapping; unauthenticated-API 404/500 behavior on edge cases (e.g. unknown `fin`) is unconfirmed without a live run. |
