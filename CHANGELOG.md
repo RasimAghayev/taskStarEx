@@ -8,6 +8,45 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Security — Gate 1 history rewrite: remove literal secret from git history (2026-11-19)
+
+- Removed the literal value `POSTGRES_PASSWORD=secret` (introduced at
+  `f8805cb`, fixed forward in the live file at `5f8dba6`, but never
+  removed from history) from the git history of `main`, `test`, and
+  `preview` via `git filter-repo --replace-text`
+  (`POSTGRES_PASSWORD=secret==>POSTGRES_PASSWORD=***REMOVED***`),
+  approved by the repo owner as Gate 1 ("Tarixdən təmizlə —
+  Gate 1 — force-push").
+- Verified before force-pushing: tip tree hashes byte-identical
+  before/after on all three branches (`main`/`test`
+  `3b607aa9581d8f9e2b41d3c222efd77e5ea785e6`, `preview`
+  `f2f201dbd865beb7a6e44f4dba9aeeaed02d61cf`), commit counts unchanged
+  (`main` 222, `test` 222, `preview` 214), zero remaining occurrences of
+  the literal string anywhere in the rewritten history.
+- Force-pushed one branch at a time (`main` then `test` then `preview`),
+  each cycle temporarily relaxing branch protection
+  (`enforce_admins:false`, `allow_force_pushes:true`), pushing, then
+  restoring it to the exact original snapshot
+  (`enforce_admins:true`, `allow_force_pushes:false`,
+  `allow_deletions:false`) before moving to the next branch. New tips:
+  `main` `037c698ed71970e696f78d9583e9d8ccfdef9bd5`, `test`
+  `64be5fa7279a89327b2b37f47a91da22d2ed2bdd`, `preview`
+  `492d91847475a66e221241182a45919eb67f8327`.
+- Live re-verification against freshly-fetched `origin` refs confirmed
+  `f8805cb` (the commit that introduced the secret) is no longer an
+  ancestor of any of the three branches, and `make verify` (Docker
+  build + test stage) passed, exit 0, on the rewritten `test` tip.
+- Two consumer-facing side effects of the pre-rewrite cleanup (not the
+  rewrite itself): PR #103 was merged to land the forward compose fix
+  on `main` before the rewrite started, and PRs #105/#106/#107 redacted
+  two docs files' prose (`docs/REPOSITORY_AUDIT.md`,
+  `docs/BASELINE.md`) that quoted the literal value, so the mechanical
+  content-level rewrite would not also mangle current, accurate
+  documentation.
+- Full evidence (exit codes, before/after tables, protection diffs):
+  `projects/info/state/handoff/4/taskStarEx-gate1-secret-history-rewrite.md`.
+  Technical-debt record: `docs/TECHNICAL_DEBT.md` P3-10.
+
 ### Changed — resolve `test`↔`main` merge conflict ahead of first promotion (2026-11-19)
 
 - Merged `main` into `test` (via `chore/resolve-test-main-conflict`) to
