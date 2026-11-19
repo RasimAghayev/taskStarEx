@@ -1,0 +1,433 @@
+openapi: 3.0.3
+info:
+  title: taskStarEx API
+  description: >-
+    Company user registry (CRUD + CSV export/import + audit log) with
+    Sanctum token-based authentication. Every /company/users/* route
+    requires a valid bearer token (Phase 9 hardening).
+  version: "1.0"
+servers:
+  - url: /api
+    description: Relative to the API host (see src/be/.env.example APP_URL / root .env.example APP_PORT)
+
+tags:
+  - name: Auth
+  - name: Company Users
+  - name: Health
+
+paths:
+  /login:
+    post:
+      tags: [Auth]
+      summary: Authenticate and obtain a Sanctum personal-access token
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string, format: password }
+      responses:
+        "200":
+          description: Login succeeded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      token: { type: string, example: "1|abcdef..." }
+                      token_type: { type: string, example: Bearer }
+                      user:
+                        type: object
+                        properties:
+                          id: { type: integer }
+                          name: { type: string }
+                          email: { type: string }
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ErrorResponse" }
+        "422":
+          description: Validation error (missing email/password)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationErrorResponse" }
+        "429":
+          description: Too many login attempts (5/min per IP, see AppServiceProvider)
+
+  /logout:
+    post:
+      tags: [Auth]
+      summary: Revoke the current access token
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  message: { type: string, example: "Logged out" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /user:
+    get:
+      tags: [Auth]
+      summary: Return the authenticated user (Laravel's built-in convention route)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: The authenticated user
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /company/users:
+    get:
+      tags: [Company Users]
+      summary: List/search company users (paginated)
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+        - { name: per_page, in: query, schema: { type: integer, default: 15 } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+      responses:
+        "200":
+          description: Paginated list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/CompanyUser" }
+                  links: { type: object }
+                  meta: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Company Users]
+      summary: Create a company user
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyUserInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string }
+                  data: { $ref: "#/components/schemas/CompanyUser" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422": { $ref: "#/components/responses/ValidationError" }
+
+  /company/users/export:
+    get:
+      tags: [Company Users]
+      summary: Export the (optionally filtered) user list as CSV
+      description: >-
+        Every string cell is sanitized against CSV/formula injection
+        (leading =, +, -, @ is prefixed with a single quote) before being
+        written. Streamed, not materialized in memory (LazyCollection
+        cursor()) -- safe for large user lists.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: CSV file
+          content:
+            text/csv:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /company/users/import:
+    post:
+      tags: [Company Users]
+      summary: Bulk-import company users from a CSV file
+      description: >-
+        Header must be exactly fin,name,surname,father,dob,email,status
+        (in that order) or the whole file is rejected with 422 before any
+        row is processed. Otherwise each row is validated independently
+        (same rules as POST /company/users); a failing row is reported,
+        not aborted. A row whose raw value starts with a CSV-formula
+        trigger character (=, +, -, @, tab, CR) is rejected outright, not
+        silently rewritten. Rate limited to 10 requests/minute per
+        authenticated user.
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV file, max 5 MB, text/csv or text/plain content type
+      responses:
+        "200":
+          description: Import finished (per-row results; HTTP 200 even if some rows failed)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, example: true }
+                  data:
+                    type: object
+                    properties:
+                      created: { type: integer }
+                      failed: { type: integer }
+                      errors:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            row: { type: integer }
+                            fin: { type: string, nullable: true }
+                            messages:
+                              type: array
+                              items: { type: string }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "422":
+          description: Malformed/missing file, wrong header, or file-level validation failure
+        "429":
+          description: Import rate limit exceeded (10/min per authenticated user)
+
+  /company/users/{fin}:
+    parameters:
+      - { $ref: "#/components/parameters/Fin" }
+    get:
+      tags: [Company Users]
+      summary: Show one company user
+      security: [{ bearerAuth: [] }]
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data: { $ref: "#/components/schemas/CompanyUser" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: No user with this fin }
+    put:
+      tags: [Company Users]
+      summary: Update a company user (full replace)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyUserInput" }
+      responses:
+        "200":
+          description: Updated
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: No user with this fin }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    patch:
+      tags: [Company Users]
+      summary: Update a company user (partial)
+      security: [{ bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CompanyUserInput" }
+      responses:
+        "200": { description: Updated }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: No user with this fin }
+        "422": { $ref: "#/components/responses/ValidationError" }
+    delete:
+      tags: [Company Users]
+      summary: Delete a company user (hard delete)
+      security: [{ bearerAuth: [] }]
+      responses:
+        "204": { description: Deleted }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: No user with this fin }
+
+  /company/users/{fin}/audit:
+    parameters:
+      - { $ref: "#/components/parameters/Fin" }
+    get:
+      tags: [Company Users]
+      summary: Change history for one company user (newest first, paginated)
+      description: >-
+        Keeps working after the underlying company_users row has been
+        hard-deleted -- the audit log has no foreign key back to it.
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: per_page, in: query, schema: { type: integer, default: 15 } }
+      responses:
+        "200":
+          description: Paginated audit log
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: array
+                    items: { $ref: "#/components/schemas/UserAuditLog" }
+                  meta: { type: object }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      description: Always 200 if the process can serve a request at all. No auth, no dependency checks.
+      security: []
+      responses:
+        "200":
+          description: Alive
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: Checks the database connection is reachable.
+      security: []
+      responses:
+        "200":
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  checks:
+                    type: object
+                    properties:
+                      database: { type: string, example: ok }
+        "503":
+          description: Not ready (database unreachable)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: error }
+                  checks:
+                    type: object
+                    properties:
+                      database: { type: string, example: error }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Laravel Sanctum personal-access token, obtained via POST /login.
+
+  parameters:
+    Fin:
+      name: fin
+      in: path
+      required: true
+      description: 7-character uppercase alphanumeric company-user identifier
+      schema: { type: string, example: AB12345 }
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid bearer token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ValidationError:
+      description: Validation failed
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationErrorResponse" }
+
+  schemas:
+    CompanyUser:
+      type: object
+      properties:
+        fin: { type: string, example: AB12345 }
+        name: { type: string }
+        surname: { type: string }
+        father: { type: string }
+        dob: { type: string, format: date, example: "1990-05-10" }
+        dob_display: { type: string, example: "10.05.1990" }
+        email: { type: string, format: email }
+        status:
+          type: string
+          enum: [new_register, it_works, vacation, maternity_leave, education, business_trip, out, removed]
+        status_label: { type: string, description: "Human-readable label for `status` (Azerbaijani)" }
+        created_at: { type: string }
+        updated_at: { type: string }
+
+    CompanyUserInput:
+      type: object
+      required: [fin, name, surname, father, dob, email, status]
+      properties:
+        fin: { type: string, minLength: 7, maxLength: 7, pattern: "^[A-Z0-9]+$" }
+        name: { type: string, minLength: 2, maxLength: 20 }
+        surname: { type: string, minLength: 2, maxLength: 50 }
+        father: { type: string, minLength: 2, maxLength: 20 }
+        dob: { type: string, format: date, example: "1990-05-10" }
+        email: { type: string, format: email }
+        status:
+          type: string
+          enum: [new_register, it_works, vacation, maternity_leave, education, business_trip, out, removed]
+
+    UserAuditLog:
+      type: object
+      properties:
+        id: { type: integer }
+        fin: { type: string }
+        action: { type: string, enum: [created, updated, deleted] }
+        changes: { type: object, description: "created/deleted: full record snapshot. updated: {field: {old, new}} per changed field." }
+        performed_by: { type: string, nullable: true, description: "Email of the authenticated actor, or null if not performed via an authenticated HTTP request." }
+        created_at: { type: string }
+
+    ErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string }
+
+    ValidationErrorResponse:
+      type: object
+      properties:
+        success: { type: boolean, example: false }
+        message: { type: string, example: "Validation errors" }
+        errors: { type: object, additionalProperties: { type: array, items: { type: string } } }
+        data: { type: object, additionalProperties: { type: array, items: { type: string } } }
+
+security:
+  - bearerAuth: []

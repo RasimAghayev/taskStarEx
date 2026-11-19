@@ -31,7 +31,7 @@ class ApiResponseClass
             'success' => true,
             'data' => $result,
         ];
-        if (!empty($message)) {
+        if (! empty($message)) {
             $response['message'] = $message;
         }
 

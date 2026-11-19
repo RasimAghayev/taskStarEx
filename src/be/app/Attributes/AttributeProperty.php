@@ -11,8 +11,7 @@ class AttributeProperty
 
     public function __construct(
         private mixed $value,
-    ) {
-    }
+    ) {}
 
     /**
      * Get the value of the attribute
