@@ -8,6 +8,63 @@ for its own releases where applicable.
 
 ## [Unreleased]
 
+### Added — Phase 15 docs, manifest, diagrams (2026-11-19)
+
+- Full community-standards file set, none of which previously existed in
+  this repo: `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1),
+  `CONTRIBUTING.md`, `SECURITY.md`, `SUPPORT.md`, `ACCESSIBILITY.md`,
+  `.github/CODEOWNERS`, `.github/ISSUE_TEMPLATE/{bug,feature,docs}.md`,
+  `.github/PULL_REQUEST_TEMPLATE.md`.
+- `docs/DEPLOYMENT.md`, `docs/OPERATIONS.md`, `docs/SECURITY_REVIEW.md`,
+  `docs/DIAGRAMS.md` (Mermaid: system context, cross-repo dependency
+  chain, 5 core-flow sequence diagrams, data model `erDiagram`,
+  deployment topology) — all derived from the real code/config (routes,
+  controllers, migrations, `docker-compose.yml`), not invented; every
+  diagram cites the source file(s) it was read from.
+- `repo-manifest.yaml` (repo root) — `type: service`, `provides.api:
+  openapi.yaml`, `license: MIT` (matches `LICENSE`); `depends_on`/
+  `related` both confirmed empty against
+  `projects/info/DEPENDENCY_MAP.md` (no other `RasimAghayev` repo
+  depends on, or is depended on by, taskStarEx).
+- `README.md` rewritten from scratch — it previously contained only the
+  original interview-task brief, not a real project README. Now covers
+  what the app does, Docker-first setup, usage examples, real testing
+  numbers (cites `docs/TEST_REPORT.md`), and links to every doc above. A
+  live CI badge was added (`actions/workflows/ci.yml/badge.svg`); no
+  Docker-image-size or coverage badge was added since neither a
+  published image (see ADR-0005) nor a coverage-reporting service exists
+  for this repo to source one from live — real measured coverage numbers
+  are given as text instead, not faked as a badge.
+- `docs/DEPENDENCY_DECISIONS.md`: added a decision entry ratifying the
+  existing MIT `LICENSE` choice (it was already MIT from this repo's
+  inception; this phase is the first to record *why*, per standing
+  decision on license choice needing a written decision entry).
+- Verified live (not assumed from an earlier phase's note,
+  `gh api repos/RasimAghayev/taskStarEx`): `secret_scanning`,
+  `secret_scanning_push_protection`, and `dependabot_security_updates`
+  are `enabled`; private vulnerability reporting is `enabled`. Reflected
+  accurately in `SECURITY.md`/`docs/SECURITY_REVIEW.md`.
+- Real, concrete accessibility findings recorded in `ACCESSIBILITY.md`
+  (not boilerplate): icon-only edit/delete buttons in
+  `src/fe/pages/company/users/index.vue` have no `aria-label`; no
+  `lang` attribute is configured in `src/fe/nuxt.config.ts`; no
+  automated accessibility tooling runs in CI or `make lint-fe`. None of
+  these are fixed in this phase (Phase 15 is docs-only, per this
+  program's R1) — tracked here as real, verified gaps.
+
+### Known program-level gap (not this phase's to fix)
+
+- `tools/generate_graph.*`, which is supposed to auto-generate
+  `projects/info/ECOSYSTEM.md` and this README's "Use together with"
+  section from `repo-manifest.yaml`, does not exist yet anywhere in this
+  program (`tools/` currently holds only `_msgfilter.py` and
+  `templates/`). `repo-manifest.yaml` was still authored per spec so the
+  tool has something correct to consume once it exists; the "Use
+  together with" section and `ECOSYSTEM.md` entry were written by hand
+  in the meantime, reflecting the manifest honestly (empty
+  `depends_on`/`related`). Flagged in this phase's handoff as a
+  program-level gap, not invented or silently worked around.
+
 ### Tests — Phase 11 test suite (2026-11-19)
 
 - **Backend**: 11 new tests added (55/161 → 66/185 assertions, zero

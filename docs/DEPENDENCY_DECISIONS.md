@@ -250,3 +250,38 @@
   (which now runs `npm run test` before the pre-existing build-output
   characterization check) — see `docs/TEST_REPORT.md`'s Phase 11 section
   for the real pass/fail count and coverage numbers.
+
+## License: MIT — ratified Phase 15, 2026-11-19
+
+- **What it is**: not a new dependency — this entry ratifies the
+  already-in-place `LICENSE` file (MIT, copyright Rasim Aghayev, present
+  in this repo since its original commit) with a written decision
+  record, per this program's standing requirement that a license choice
+  be deliberate and documented, not merely present.
+- **Why MIT, and why no change was made**: this is a small, standalone
+  service with no present reason to restrict downstream use or require
+  derivative works to stay open (which is what a copyleft license like
+  GPL/LGPL would do). MIT is this program's own default recommendation
+  for a service/library repo absent a specific reason otherwise, and
+  nothing about this repo's actual content (an interview-task-derived
+  CRUD service, no proprietary/trade-secret logic, no embedded
+  copyleft-licensed third-party code found during Phase 3's audit)
+  argues for anything else. Apache-2.0 (the program's other default
+  option, mainly differing by adding an explicit patent grant) was
+  considered and not chosen — there is no patent-sensitive contribution
+  scenario here to justify the extra license text.
+- **Third-party license compliance**: Phase 3's audit found no
+  vendored/embedded third-party source carrying its own license term
+  that would need preserving or would conflict with MIT; all
+  dependencies are pulled via Composer/npm (their own licenses apply to
+  the installed packages, not to this repo's own code) — see each
+  dependency's own entry in this file for its license where added under
+  standing decision 3.
+- **Where it's surfaced**: `LICENSE` (full text, unchanged), one-line
+  notice in `README.md`'s License section, and `license: MIT` in
+  `repo-manifest.yaml` (an addition to `PROMPT.md` Phase 15's example
+  schema, which doesn't show every optional field) so the Community
+  Standards verification point "LICENSE matches the declared license in
+  `repo-manifest.yaml`" has something real to check against.
+- **Known vulnerabilities / size / standard-library equivalent**: not
+  applicable — this is a license choice, not a software dependency.
