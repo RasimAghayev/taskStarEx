@@ -1,0 +1,308 @@
+name: CI
+
+# Consolidates the former backend-only `laravel.yml` into a single pipeline
+# covering both app roots (src/be Laravel API, src/fe Nuxt SPA), per the
+# CI/CD runner-time standard (PROMPT.md section 3/5, Phase 10).
+#
+# Shape: path-filter -> lint/static-analysis (parallel, cheap, fail fast)
+#        -> Docker test stage (the repo's own, already-proven
+#           `docker build --target test`) -> dependency/advisory audit
+#        -> runtime-image build validation.
+# Nothing here publishes an image — see docs/TECHNICAL_DEBT.md P3-9 for the
+# documented decision not to wire a GHCR publish-on-tag job for this repo.
+
+on:
+  pull_request:
+    branches: ["preview", "test", "main"]
+  push:
+    branches: ["preview", "test", "main"]
+  workflow_dispatch: {}
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  # -------------------------------------------------------------------------
+  # Stage 0: which of the two independent app roots actually changed. Both
+  # Dockerfiles/app directories are independent (no shared code, HTTP-only
+  # wiring per docs/ARCHITECTURE.md), so a frontend-only change should not
+  # pay for a backend Docker build and vice versa.
+  # -------------------------------------------------------------------------
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'src/be/**'
+              - 'php.dockerfile'
+              - 'nginx.dockerfile'
+              - 'server/**'
+              - 'docker-compose.yml'
+              - '.dockerignore'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'src/fe/**'
+              - 'node.dockerfile'
+              - 'docker-compose.yml'
+              - '.github/workflows/ci.yml'
+
+  # -------------------------------------------------------------------------
+  # Stage 1 (parallel, cheap, fail fast): the exact checks Phase 9 wired as
+  # `make lint` / `make stan` / `make lint-fe`, run directly against
+  # `docker build --target build` (same target the Makefile's `php-dev` /
+  # `fe-dev` tool runners use) so GitHub Actions' own layer cache
+  # (`type=gha`) can be used — `docker compose build` itself is not
+  # cache-addressable without editing docker-compose.yml, which is Phase
+  # 5/container-engineer's file, not this phase's (CI files only).
+  # -------------------------------------------------------------------------
+  backend-quality:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: php.dockerfile
+          target: build
+          tags: be-build:ci
+          load: true
+          push: false
+          cache-from: type=gha,scope=php-be
+          cache-to: type=gha,mode=max,scope=php-be
+      - name: laravel/pint --test
+        run: docker run --rm be-build:ci ./vendor/bin/pint --test
+      - name: Larastan (phpstan)
+        run: docker run --rm be-build:ci ./vendor/bin/phpstan analyse --memory-limit=512M
+
+  frontend-quality:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: node.dockerfile
+          target: build
+          tags: fe-build:ci
+          load: true
+          push: false
+          cache-from: type=gha,scope=node-fe
+          cache-to: type=gha,mode=max,scope=node-fe
+      - name: eslint (@nuxt/eslint flat config)
+        run: docker run --rm fe-build:ci sh -c "npx nuxt prepare && npm run lint"
+
+  # -------------------------------------------------------------------------
+  # Stage 2: the repo's own already-proven Docker test stage. The build
+  # itself fails if `php artisan test` / the Nitro bundle check fails — see
+  # php.dockerfile / node.dockerfile. `needs` on the quality job lets the
+  # GHA cache populated there be reused here (same scope), not just run in
+  # parallel and rebuilt from scratch.
+  # -------------------------------------------------------------------------
+  backend-test:
+    needs: [changes, backend-quality]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: php.dockerfile
+          target: test
+          push: false
+          load: false
+          cache-from: type=gha,scope=php-be
+          cache-to: type=gha,mode=max,scope=php-be
+
+  frontend-test:
+    needs: [changes, frontend-quality]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: node.dockerfile
+          target: test
+          push: false
+          load: false
+          cache-from: type=gha,scope=node-fe
+          cache-to: type=gha,mode=max,scope=node-fe
+
+  # -------------------------------------------------------------------------
+  # Stage 3: dependency/advisory audit (composer audit --locked, npm audit).
+  # Policy (evidence-based, see docs/TECHNICAL_DEBT.md P1-5):
+  #   - any composer advisory of severity critical/high (or with no severity
+  #     field at all — FriendsOfPHP advisories often omit it; fail closed)
+  #     blocks the job. Currently 0 advisories (verified: `composer audit
+  #     --locked` -> "No security vulnerability advisories found").
+  #   - npm: any NEW critical/high advisory blocks. The one standing
+  #     accepted-risk advisory (`GHSA-fc5q-39xc-vjpf`, picomatch ReDoS, no
+  #     upstream fix at any current vite/laravel-vite-plugin/nuxt version —
+  #     documented in docs/TECHNICAL_DEBT.md) is allow-listed by GHSA ID so
+  #     it does not perpetually fail CI; anything else at high/critical
+  #     fails the job. Currently: src/fe 52 high/0 critical, src/be 6
+  #     high/0 critical, both 100% traced to the allow-listed advisory
+  #     (verified locally this phase via `npm audit --json`, re-verify if
+  #     this policy is ever questioned).
+  #   - low/medium findings are reported only, never block (per directive).
+  # -------------------------------------------------------------------------
+  backend-audit:
+    needs: [changes, backend-test]
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2.40.0
+        with:
+          php-version: '8.5'
+          coverage: none
+      - name: composer audit --locked (src/be)
+        working-directory: src/be
+        run: |
+          set -e
+          composer audit --locked --no-interaction --format=json > composer-audit.json || true
+          echo "--- composer audit (full) ---"
+          cat composer-audit.json
+          BLOCKING=$(jq '[ .advisories[]? | ((.severity // "high") as $sev | select($sev == "critical" or $sev == "high")) ] | length' composer-audit.json)
+          echo "blocking (critical/high/unknown-severity) composer advisories: $BLOCKING"
+          if [ "$BLOCKING" != "0" ]; then
+            echo "::error::New critical/high composer advisory on src/be — see composer-audit.json above, triage in docs/TECHNICAL_DEBT.md"
+            exit 1
+          fi
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: 'npm'
+          cache-dependency-path: src/be/package-lock.json
+      - name: npm ci (src/be Vite asset pipeline)
+        working-directory: src/be
+        run: npm ci
+      - name: npm audit (src/be)
+        working-directory: src/be
+        run: |
+          set -e
+          ALLOW='GHSA-fc5q-39xc-vjpf'
+          npm audit --json > npm-audit.json || true
+          CRIT=$(jq '.metadata.vulnerabilities.critical' npm-audit.json)
+          UNALLOWED=$(jq --arg allow "$ALLOW" '[ .vulnerabilities[]? | select(.severity=="critical" or .severity=="high") | .via[]? | select(type=="object") | (.url // "") ] | map(select(test($allow) | not)) | unique' npm-audit.json)
+          UNALLOWED_COUNT=$(echo "$UNALLOWED" | jq 'length')
+          echo "critical=$CRIT  unallowed-high/critical-advisories=$UNALLOWED"
+          if [ "$CRIT" != "0" ] || [ "$UNALLOWED_COUNT" != "0" ]; then
+            echo "::error::New critical/high npm advisory on src/be not covered by the accepted-risk allowlist (docs/TECHNICAL_DEBT.md P1-5)"
+            jq '.vulnerabilities' npm-audit.json
+            exit 1
+          fi
+
+  frontend-audit:
+    needs: [changes, frontend-test]
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '26'
+          cache: 'npm'
+          cache-dependency-path: src/fe/package-lock.json
+      - name: npm ci (src/fe)
+        working-directory: src/fe
+        run: npm ci
+      - name: npm audit (src/fe)
+        working-directory: src/fe
+        run: |
+          set -e
+          ALLOW='GHSA-fc5q-39xc-vjpf'
+          npm audit --json > npm-audit.json || true
+          CRIT=$(jq '.metadata.vulnerabilities.critical' npm-audit.json)
+          UNALLOWED=$(jq --arg allow "$ALLOW" '[ .vulnerabilities[]? | select(.severity=="critical" or .severity=="high") | .via[]? | select(type=="object") | (.url // "") ] | map(select(test($allow) | not)) | unique' npm-audit.json)
+          UNALLOWED_COUNT=$(echo "$UNALLOWED" | jq 'length')
+          echo "critical=$CRIT  unallowed-high/critical-advisories=$UNALLOWED"
+          if [ "$CRIT" != "0" ] || [ "$UNALLOWED_COUNT" != "0" ]; then
+            echo "::error::New critical/high npm advisory on src/fe not covered by the accepted-risk allowlist (docs/TECHNICAL_DEBT.md P1-5)"
+            jq '.vulnerabilities' npm-audit.json
+            exit 1
+          fi
+
+  # -------------------------------------------------------------------------
+  # Stage 4: validate the actual runtime images (the ones a real deployment
+  # would use) still build. No push anywhere — see docs/TECHNICAL_DEBT.md
+  # P3-9 for why this repo does not publish to GHCR.
+  # -------------------------------------------------------------------------
+  docker-build-validate:
+    needs: [changes, backend-test, frontend-test]
+    if: |
+      always() &&
+      (needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true') &&
+      needs.backend-test.result != 'failure' && needs.backend-test.result != 'cancelled' &&
+      needs.frontend-test.result != 'failure' && needs.frontend-test.result != 'cancelled'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Provision .env for compose interpolation
+        run: make env
+      - name: Validate docker-compose.yml
+        run: docker compose config -q
+      - name: Build php runtime image
+        if: needs.changes.outputs.backend == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: php.dockerfile
+          target: runtime
+          push: false
+          load: false
+          cache-from: type=gha,scope=php-be
+          cache-to: type=gha,mode=max,scope=php-be
+      - name: Build nginx image
+        if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: nginx.dockerfile
+          push: false
+          load: false
+          cache-from: type=gha,scope=nginx
+          cache-to: type=gha,mode=max,scope=nginx
+      - name: Build fe runtime image
+        if: needs.changes.outputs.frontend == 'true'
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: node.dockerfile
+          target: runtime
+          push: false
+          load: false
+          cache-from: type=gha,scope=node-fe
+          cache-to: type=gha,mode=max,scope=node-fe

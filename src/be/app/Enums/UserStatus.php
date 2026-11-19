@@ -5,6 +5,15 @@ namespace App\Enums;
 use App\Attributes\Description;
 use App\Traits\AttributableEnum;
 
+/**
+ * Phase 9 (quality tooling): `description()` only exists at runtime via
+ * AttributableEnum's `__call()` (reflection over each case's `#[Description]`
+ * attribute) -- there is no literal method declaration for PHPStan/Larastan
+ * to see. This is PHPStan's own documented pattern for a magic `__call`
+ * method, not a real-code change.
+ *
+ * @method string description()
+ */
 enum UserStatus: string
 {
     use AttributableEnum;
