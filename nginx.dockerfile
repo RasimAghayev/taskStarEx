@@ -5,7 +5,7 @@
 # Laravel's standard public web root, not composer/build-generated, so no
 # cross-stage copy from php.dockerfile is needed.
 
-FROM nginx:1.31.9-alpine@sha256:90b6bd2aec278b16b98221d64deb1d6d35d164567f507ab0716e6053878315aa
+FROM nginx:1.31.9-alpine@sha256:fb4658584bd9a916ffb6f6e365f97c25cfdb2923801f551ea08356e695f14ff7
 
 COPY server/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY src/be/public /var/www/html/be/public
